@@ -1,0 +1,6 @@
+"scenario_id","SR","obs","assess","advice","Fcap","ni","proj_nyr"
+1,"bh","perfect","none","fcap",1,5,5
+2,"bh","perfect","none","fcap",1.25,5,5
+3,"bh","perfect","none","fcap",1.5,5,5
+4,"bh","perfect","none","fcap",2,5,5
+5,"bh","perfect","none","fcap",3,5,5
