@@ -1,0 +1,3 @@
+metric,ane9aS_estimate,thorson_mean,thorson_sd,interpretation
+sigmaR,0.2799708215697645,0.74,0.35,Lower than global mean recruitment variability
+AR1 rho,0.11708832704408723,0.43,0.28,Low temporal autocorrelation

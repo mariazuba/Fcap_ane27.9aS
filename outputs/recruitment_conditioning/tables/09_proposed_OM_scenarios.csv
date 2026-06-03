@@ -1,0 +1,8 @@
+OM_scenario,SR_model,a_multiplier,b_multiplier,sigmaR_value,AR1_rho,rationale
+base,Beverton-Holt,1,1,0.2799708215697645,0,Reference OM based on fitted BH and observed recruitment residuals.
+high_sigmaR_Thorson,Beverton-Holt,1,1,0.74,0,High recruitment variability scenario using Thorson et al. 2014 global mean sigmaR.
+high_sigmaR_150,Beverton-Holt,1,1,0.41995623235464674,0,Strong increase in recruitment variability relative to ane9aS residuals.
+low_productivity_075,Beverton-Holt,0.75,1,0.2799708215697645,0,Moderate low-productivity regime.
+low_productivity_050,Beverton-Holt,0.5,1,0.2799708215697645,0,Severe low-productivity regime.
+AR1_recruitment_Thorson,Beverton-Holt,1,1,0.2799708215697645,0.43,Exploratory scenario using Thorson et al. 2014 mean autocorrelation.
+poor_recruitment_tail,Beverton-Holt,1,1,0.2799708215697645,0,Stress-test based on observed lower-tail recruitment residuals.

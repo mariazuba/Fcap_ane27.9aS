@@ -1,0 +1,292 @@
+---
+title: "Recruitment conditioning"
+execute:
+  dir: project
+---
+
+## Objectives
+
+The objectives of the recruitment conditioning analyses were to:
+
+1. Evaluate whether the Beverton–Holt stock–recruitment relationship implemented in the Operating Model adequately reproduces the relationship estimated in the final SS3 assessment.
+2. Characterize the magnitude and distribution of historical recruitment variability.
+3. Assess evidence for temporal autocorrelation and productivity regime shifts.
+4. Define biologically plausible recruitment scenarios for robustness testing within the MSE framework.
+
+
+```{r setup, include=FALSE}
+library(readr)
+library(dplyr)
+library(knitr)
+
+root_dir <- "/home/maria-jose/CESGA/Fcap_ane27.9aS"
+
+fig_dir <- file.path(
+  root_dir,
+  "outputs",
+  "recruitment_conditioning",
+  "figures"
+)
+
+tab_dir <- file.path(
+  root_dir,
+  "outputs",
+  "recruitment_conditioning",
+  "tables"
+)
+```
+
+## Recruitment dynamics and stock-recruitment relationship
+
+Recruitment dynamics in the Operating Model (OM) were conditioned using historical spawning stock biomass (SSB) and recruitment estimates derived from the final Stock Synthesis (SS3) assessment for anchovy in Division 9a South (ane.27.9aS). 
+
+Recruitment was assumed to occur in the third quarter (Q3), while spawning stock biomass was evaluated in the second quarter (Q2), consistent with the biological timing implemented in the assessment model.
+
+A Beverton-Holt stock-recruitment (SR) relationship was fitted to the historical SSB and recruitment series using the FLSR framework. The fitted OM SR relationship was subsequently compared with the Beverton-Holt parameterization estimated within SS3 to verify consistency between the assessment model and the operating model. Predicted recruitment values from both formulations were compared across the observed range of SSB, and differences in expected recruitment and residuals patterns were quantified.
+
+To facilitate interpretation of recruitment uncertainty, recruitment envelopes corresponding to the estimated recruitment variability were calculated around the SS3 stock-recruitment relationship.  Median recruitment predictions were combined with lognormal recruitment deviations using the estimated recruitment standard deviation ($\sigma_R$) from the assessment model.
+
+### Recruitment residual diagnostics
+
+Historical recruitment residuals were calculated as:
+
+
+$\varepsilon_t = \log(R_{obs,t})-\log(R_{pred,t})$
+
+where ($R_{obst,t}$) represents observed recruitment and ($R_{pred,t}$) the recruitment predicted by the fitted Beverton-Holt relationship.
+
+The distributional properties of recruitment residuals were evaluated to determine whether the assumptions commonly adopted in fisheries simulated models were supported by the historical data.
+
+Diagnostics included:
+
+- Time-series plots of recruitment residuals
+- Histograms and kernel density estimates
+- Quantile-quantile (QQ) plots
+- Summary statistics including mean, standard deviation, skewness and kurtosis
+- Comparison of observed residual quantiles with those expected under a lognormal recruitment process.
+
+Normality of residuals was evaluated using the Shapiro-Wilk test. The objective was not to formally validate a strict normal distribution, but rather to identify substantial departures from the lognormal assumption commonly used in stock assessment and management strategy evaluation frameworks.
+
+
+### Autocorrelation analysis
+
+### Regime-shift diagnostics
+
+### Development of recruitment scenarios
+
+
+## Results
+
+
+### Historical recruitment dynamics
+
+Historical recruitment exhibited substantial interannual variability throughout the period 1989–2024, ranging from approximately 3.5 to 12 million recruits (Figure X). Despite this variability, no long-term increasing or decreasing trend was apparent.
+
+A five-year moving average revealed periods of relatively high recruitment during the late 1990s and again after 2015, whereas lower recruitment productivity was observed around 2008–2012 (Figure X). However, these fluctuations appeared gradual and transient rather than indicative of persistent productivity regimes.
+
+
+```{r, echo=FALSE, fig.align='center', out.width='80%',fig.cap="xxx"}
+knitr::include_graphics(file.path(fig_dir, "01_historical_recruitment_timeseries.png"))
+```
+
+
+
+
+```{r, echo=FALSE, fig.align='center', out.width='80%',fig.cap="xxx"}
+knitr::include_graphics(file.path(fig_dir, "10_recruitment_rolling_mean_5yr.png"))
+```
+
+
+### Stock–recruitment relationship
+
+The Beverton–Holt stock–recruitment relationship fitted within the Operating Model closely reproduced the relationship estimated by the final SS3 assessment (**Figure X**). The estimated Beverton–Holt parameters for the Operating Model were $a$=8.93×106 recruits and $b$=1.90×103t, resulting in recruitment predictions that were highly consistent with those from the assessment model across the observed range of spawning stock biomass.
+
+The historical recruitment variability estimated from the Operating Model residuals ($\sigma_R$=0.28) was slightly lower than the value estimated within the SS3 assessment ($\sigma_R$=0.33).
+
+Consequently, the assessment estimate was retained as the reference value for characterizing recruitment uncertainty in the Operating Model, providing a precautionary representation of recruitment variability.
+
+Alternative stock–recruitment formulations were also evaluated. A segmented regression model provided a marginally better statistical fit than the Beverton–Holt model ($AIC$ = -68.91 versus -68.84), although the difference was negligible ($\Delta AIC$ = 0.08). 
+
+Following conventional model selection criteria, both models received essentially equivalent support from the data. The Beverton–Holt formulation was therefore retained as the reference Operating Model due to its consistency with the assessment model, while the segmented relationship was considered as an alternative productivity scenario for robustness testing within the MSE framework.
+
+
+```{r, echo=FALSE, fig.align='center', out.width='80%',fig.cap="xxx"}
+knitr::include_graphics(file.path(fig_dir, "02_SR_curve_OM_vs_SS3_sigmaR.png"))
+```
+
+
+
+```{r, echo=FALSE, fig.align='center', out.width='80%',fig.cap="xxx"}
+knitr::include_graphics(file.path(fig_dir, "11_SR_models_BH_vs_segmented.png"))
+```
+
+
+
+
+```{r}
+sr_parameters <- read_csv(
+  file.path(tab_dir, "01_SR_parameter_table.csv"),
+  show_col_types = FALSE
+)
+
+sr_parameters %>%
+  mutate(value = round(value, 3)) %>%
+  knitr::kable(
+    caption = "Stock-recruitment parameters used to compare the OM and SS3 Beverton-Holt relationships."
+  )
+```
+
+
+
+
+```{r}
+sr_parameters2 <- read_csv(
+  file.path(tab_dir, "16_SR_model_comparison_BH_segmented.csv"),
+  show_col_types = FALSE
+)
+
+sr_parameters2 %>%
+  mutate(value = round(value, 3)) %>%
+  knitr::kable(
+    caption = "Stock-recruitment parameters used to compare the OM and segmented relationships."
+  )
+```
+
+
+### Recruitment residual diagnostics
+
+Recruitment residuals were approximately symmetric and centred around zero (Figure X). The histogram and quantile–quantile plot indicated reasonable agreement with the lognormal error assumption commonly adopted in stock assessment and MSE applications, although moderate deviations were observed in the lower and upper tails of the distribution.
+
+Consistent with these visual diagnostics, the Shapiro–Wilk test did not reject the null hypothesis of normality (W = 0.946, p = 0.08). Recruitment variability estimated from historical residuals (σR = 0.28) was slightly lower than the value estimated within the SS3 assessment model (σR = 0.33), suggesting moderate recruitment variability relative to values reported in global meta-analyses of marine fish stocks.
+
+```{r, echo=FALSE, fig.align='center', out.width='80%',fig.cap="xxx"}
+knitr::include_graphics(file.path(fig_dir, "04_OM_residual_distribution_vs_sigmaR.png"))
+
+
+knitr::include_graphics(file.path(fig_dir, "05_OM_residual_QQplot.png"))
+
+
+knitr::include_graphics(file.path(fig_dir, "06_OM_residuals_vs_SSB_sigmaR.png"))
+
+```
+
+
+
+
+```{r}
+resid_tests1 <- read_csv(
+  file.path(tab_dir, "05_recruitment_residual_summary.csv"),
+  show_col_types = FALSE
+)
+
+resid_tests <- read_csv(
+  file.path(tab_dir, "06_recruitment_residual_tests.csv"),
+  show_col_types = FALSE
+)
+
+resid_tests %>%
+  mutate(
+    statistic = round(statistic, 3),
+    p_value = round(p_value, 3)
+  ) %>%
+  knitr::kable(
+    caption = "Recruitment residual diagnostic tests."
+  )
+```
+
+05_recruitment_residual_summary.csv
+
+
+### Temporal dependence and regimen-shift diagnostics
+
+No significant temporal autocorrelation was detected in recruitment residuals. Ljung–Box tests at lags 1, 3 and 5 were non-significant (p > 0.17), and the estimated AR(1) coefficient was low (ρ = 0.12) and not significantly different from zero (p = 0.48).
+
+Similarly, no evidence of persistent recruitment regime shifts was identified. Neither changepoint analyses (mean or mean-and-variance) nor structural breakpoint diagnostics detected statistically significant changes in recruitment productivity during the historical period.
+
+Overall, the recruitment series appears consistent with a stationary process characterized by substantial interannual variability but limited temporal dependence.
+
+```{r, echo=FALSE, fig.align='center', out.width='80%',fig.cap="xxx"}
+knitr::include_graphics(file.path(fig_dir, "08_OM_residual_ACF.png"))
+
+knitr::include_graphics(file.path(fig_dir, "09_OM_residual_PACF.png"))
+```
+
+```{r}
+ar1_table <- read_csv(
+  file.path(tab_dir, "12_AR1_recruitment_residuals.csv"),
+  show_col_types = FALSE
+)
+
+ar1_table %>%
+  mutate(
+    estimate = round(estimate, 3),
+    se = round(se, 3),
+    z = round(z, 3),
+    p_value = round(p_value, 3)
+  ) %>%
+  knitr::kable(
+    caption = "AR(1) model fitted to recruitment residuals."
+  )
+```
+
+### Productivity regime diagnostics
+
+No evidence of persistent productivity regime shifts was detected.
+
+Neither changepoint analyses nor structural breakpoint diagnostics identified statistically significant changes in recruitment productivity during the historical period.
+
+```{r}
+cpt_table <- read_csv(
+  file.path(tab_dir, "13_changepoint_recruitment.csv"),
+  show_col_types = FALSE
+)
+
+bp_table <- read_csv(
+  file.path(tab_dir, "14_strucchange_breakpoints_recruitment.csv"),
+  show_col_types = FALSE
+)
+
+cpt_table %>%
+  knitr::kable(
+    caption = "Change-point diagnostics for historical recruitment."
+  )
+
+bp_table %>%
+  knitr::kable(
+    caption = "Structural break diagnostics for historical recruitment."
+  )
+```
+
+
+```{r}
+scenario_table <- read_csv(
+  file.path(tab_dir, "09_proposed_OM_scenarios.csv"),
+  show_col_types = FALSE
+)
+
+scenario_table %>%
+  select(OM_scenario, SR_model, a_multiplier, sigmaR_value, AR1_rho, rationale) %>%
+  mutate(
+    sigmaR_value = round(sigmaR_value, 3),
+    AR1_rho = round(AR1_rho, 3)
+  ) %>%
+  knitr::kable(
+    caption = "Candidate recruitment scenarios for the MSE Operating Model."
+  )
+```
+
+
+### Implications for OM conditioning
+
+The recruitment diagnostics support the use of independent lognormal recruitment deviations around a Beverton–Holt stock–recruitment relationship as the reference Operating Model.
+
+Nevertheless, uncertainty remains regarding recruitment variability, stock–recruitment form, productivity and temporal dependence. Consequently, a suite of alternative recruitment scenarios was developed for robustness testing within the MSE framework.
+
+These scenarios include:
+- Increased recruitment variability.
+- Reduced productivity.
+- Alternative stock–recruitment formulations.
+- Autocorrelated recruitment deviations.
+- Extreme low-recruitment events.
+
+09_proposed_OM_scenarios.csv

@@ -1,0 +1,51 @@
+project:
+  type: book
+  output-dir: _output
+
+book:
+  title: "Management Strategy Evaluation for Anchovy in ICES Division 9.a South"
+  subtitle: "Working Document"
+  author:
+    - "María José Zúñiga Basualto"
+    - "Fernando Ramos Mondrego"
+  date: today
+
+  chapters:
+    - index.qmd
+    - sections/01_introduction.qmd
+    - sections/02_management_context.qmd
+    - sections/03_mse_framework.qmd
+    - sections/04_operating_model.qmd
+    - sections/05_recruitment_conditioning.qmd
+    - sections/06_hcrs.qmd
+    - sections/07_scenarios.qmd
+    - sections/08_performance_metrics.qmd
+    - sections/09_preliminary_results.qmd
+    #- sections/10_discussion_next_steps.qmd
+    #- references.qmd
+
+#bibliography: references.bib
+
+format:
+  docx:
+    toc: true
+    number-sections: false
+   # reference-doc: templates/ices_wd_template.docx
+  pdf:
+    toc: true
+    number-sections: false
+    documentclass: article
+    top-level-division: section
+    pdf-engine: lualatex
+  html:
+    toc: true
+    number-sections: true
+    theme: cosmo
+
+execute:
+  echo: false
+  warning: false
+  message: false
+  freeze: auto
+
+lang: en
