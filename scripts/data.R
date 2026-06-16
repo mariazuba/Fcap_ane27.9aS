@@ -1,3 +1,11 @@
+################################################################################
+#
+# OM anchovy 9aS
+#
+################################################################################
+
+
+
 rm(list=ls())
 
 #'*===========================================================================*
@@ -25,6 +33,7 @@ mkdir(data_om)
 
 # Data requerida 
 stk_ane9aS_rds          <- "boot/data/stk_ane9aS.rds"
+ss3_ane9aS.rds          <- "boot/data/ss3_ane9aS.rds"
 seine_vcost_csv         <- "boot/data/seine_vcost.csv"
 seine.met1_effshare_csv <- "boot/data/seine.met1_effshare.csv"
 seine_effort_csv        <- "boot/data/seine_effort.csv"
@@ -32,16 +41,17 @@ seine_capacity_csv      <- "boot/data/seine_capacity.csv"
 seine_crewshare_csv     <- "boot/data/seine_crewshare.csv"
 seine_fcost_csv         <- "boot/data/seine_fcost.csv"
 
-
+dir.create("data/mse", recursive = TRUE, showWarnings = FALSE)
+dir.create("config", recursive = TRUE, showWarnings = FALSE)
 
 #'*===========================================================================*
 # SIMULATION PARAMETERS                                                    ----
 #'*===========================================================================*
 
-first.yr <- 1989  # First year of the historic data.
+first.yr    <- 1989  # First year of the historic data.
 last.obs.yr <- 2024 # último año del assessment / último año observado
-proj.yr  <- 2025  # first year of projection
-proj.nyr <- 5   # Number of years in the projection period
+proj.yr     <- 2025  # first year of projection
+proj.nyr    <- 10   # Number of years in the projection period
 
 #'---- periods ----
 
@@ -52,12 +62,17 @@ ass.yr   <- proj.yr-1              # assessment year
   
 
 # seasons and iterations
-ni <- 5 #! coded for 1 iteration
+ni <- 100
 ns <- 4
+
+seed <- 123
+
+experiment_name <- paste0("test_", ni, "iter_", proj.nyr, "year")
 
 #'*===========================================================================*
 # LOAD HISTORICAL DATA (assessment + indices)                              ----
 #'*===========================================================================*
+ss3       <- readRDS(ss3_ane9aS.rds)
 stk0      <- readRDS(stk_ane9aS_rds)
 stk       <- propagate(stk0, ni) # Extend to the number of iterations
 
@@ -172,58 +187,205 @@ biols.ctrl   <- create.biols.ctrl (stksnames=stks,growth.model=growth.model)
 #'*===========================================================================*
 ## SRs data and model----
 #'*===========================================================================*
-ss.rec <- 3
-ss.ssb <- 2
+
+ss.rec <- 3   # recruitment season
+ss.ssb <- 2   # spawning season
 
 rec_h <- rec(stk0)[,,,ss.rec, drop = FALSE]
 ssb_h <- ssb(stk0)[,,,ss.ssb, drop = FALSE]
 
-mod2_bh <- FLSR(
-  rec   = rec_h,
-  ssb   = ssb_h,
-  model = bevholt
+# Years used to condition the SR relationship
+fit_yrs <- first.yr:last.obs.yr
+
+# -----------------------------------------------------------------------------
+# 1. Fit alternative SR models
+# -----------------------------------------------------------------------------
+
+# Base model: Beverton-Holt
+mod_bh <- FLSR(rec = rec_h, ssb = ssb_h, model = bevholt)
+fit_bh <- fmle(window(mod_bh, start = first.yr, end = last.obs.yr))
+# Alternative 1: segmented regression
+mod_seg <- FLSR(rec = rec_h, ssb = ssb_h, model = "segreg")
+fit_seg <- fmle(window(mod_seg, start = first.yr, end = last.obs.yr))
+# Alternative 2: segmented regression with breakpoint fixed at Blim
+mod_segBlim   <- FLSR(rec = rec_h, ssb = ssb_h, model = "segreg")
+fit_segBlim_a <- fmle(window(mod_segBlim, start = first.yr, end = last.obs.yr),
+                 fixed = list(b = ANE_ref.pts[["Blim"]]), method = "Brent", lower = 35, upper = 10000)
+fit_segBlim   <- fmle(mod_segBlim,fixed = list(a = fit_segBlim_a@params[1], b = ANE_ref.pts[["Blim"]]))
+# Alternative 3: segmented regression with breakpoint fixed at Bpa
+mod_segBpa   <- FLSR(rec = rec_h, ssb = ssb_h, model = "segreg")
+fit_segBpa_a <- fmle(window(mod_segBpa, start = first.yr, end = last.obs.yr),
+                fixed = list(b = ANE_ref.pts[["Bpa"]]), method = "Brent", lower = 35, upper = 10000)
+fit_segBpa   <- fmle(mod_segBpa, fixed = list(a = fit_segBpa_a@params[1], b = ANE_ref.pts[["Bpa"]]))
+
+save(fit_bh, fit_seg, fit_segBlim, fit_segBpa, file = "data/mse/SRs_models.RData")
+
+
+#'*===========================================================================*
+## FLBEIA input object: SRs ----
+#'*===========================================================================*
+# Helper function to create FLBEIA SR object
+make_SRs <- function(fit, model_name, stk, stock_name = "ANE", ss.rec = 3, ss.ssb = 2) {
+  
+  SRs <- list()
+  SRs[[stock_name]] <- FLSRsim(name=stock_name, model=model_name, rec=rec(stk), ssb=ssb(stk))
+  SRs[[stock_name]]@params[] <- params(fit)
+  
+  # Recruitment enters in season 3
+  SRs[[stock_name]]@proportion[] <- 0
+  SRs[[stock_name]]@proportion[,,,ss.rec,,] <- 1
+  
+  # Spawning in season 2 produces recruitment in season 3 of the same year
+  SRs[[stock_name]]@timelag["year", ]   <- 0
+  SRs[[stock_name]]@timelag["season", ] <- ss.ssb
+  
+  SRs[[stock_name]]@uncertainty[] <- 1
+  
+  return(SRs)
+}
+
+SRs_bh      <- make_SRs(fit_bh,      "bevholt", ane, ss.rec = ss.rec, ss.ssb = ss.ssb)
+SRs_seg     <- make_SRs(fit_seg,     "segreg",  ane, ss.rec = ss.rec, ss.ssb = ss.ssb)
+SRs_segBlim <- make_SRs(fit_segBlim, "segreg",  ane, ss.rec = ss.rec, ss.ssb = ss.ssb)
+SRs_segBpa  <- make_SRs(fit_segBpa,  "segreg",  ane, ss.rec = ss.rec, ss.ssb = ss.ssb)
+
+
+#'*===========================================================================*
+## Recruitment uncertainty scenarios ----
+#'*===========================================================================*
+
+# Historical residuals from base BH model
+rec_dev_hist <- exp(residuals(fit_bh))
+
+tmp_hist <- SRs_bh$ANE@uncertainty[, ac(fit_yrs), , ss.rec, , ]
+tmp_hist[] <- as.numeric(rec_dev_hist)
+
+SRs_bh$ANE@uncertainty[, ac(fit_yrs), , ss.rec, , ] <- tmp_hist
+# Historical recruitment variability estimated from BH residuals
+sigmaR_hist <- sd(as.numeric(residuals(fit_bh)), na.rm = TRUE)
+# sigmaR_hist <- sqrt(var(log(SRs_bh$ANE@uncertainty[, ac(fit_yrs), , ss.rec, ]),na.rm = TRUE))
+
+sigmaR_scenarios <- c(
+  hist = sigmaR_hist,
+  SS3  = 0.33,
+  s05  = 0.50,
+  s07  = 0.70
 )
 
-fit2_bh <- fmle(
-  window(mod2_bh,
-         start = first.yr,
-         end   = last.obs.yr)
+
+# La relación stock-reclutamiento de Beverton-Holt se mantuvo como modelo base 
+# porque es coherente con el modelo de evaluación y mostró un ajuste comparable al 
+# modelo segmentado libre. Aunque los modelos segmentados con punto de quiebre fijo
+# en Blim y Bpa presentaron valores de AIC más bajos, se trataron como escenarios 
+# de robustez estructural porque sus puntos de quiebre fueron impuestos en niveles 
+# de biomasa de referencia y no estimados libremente desde los datos.
+
+# Extreme recruitment event based on the historical recruitment distribution
+rec_hist_values <- as.numeric(rec_h)
+
+extreme_prob <- 0.05
+
+extreme_multiplier_hist <- as.numeric(
+  quantile(rec_hist_values, probs = extreme_prob, na.rm = TRUE) /
+    median(rec_hist_values, na.rm = TRUE)
 )
 
-SRs_bh <- list(
-  ANE = FLSRsim(
-    name  = "ANE",
-    model = "bevholt",
-    rec   = rec(ane),
-    ssb   = ssb(ane)
-  )
+
+#'*===========================================================================*
+## Function to simulate future recruitment deviations ----
+#'*===========================================================================*
+
+add_rec_uncertainty <- function(SRs,
+                                proj.yrs,
+                                sigmaR,
+                                stock_name = "ANE",
+                                ss.rec = 3,
+                                seed = 123,
+                                extreme_event = FALSE,
+                                extreme_prob = 0.05,
+                                extreme_multiplier = 0.25) {
+  
+  set.seed(seed)
+  
+  target   <- SRs[[stock_name]]@uncertainty[, ac(proj.yrs), , ss.rec, , ]
+  rec_devs <- exp(rnorm(length(target), mean = 0, sd = sigmaR))
+  
+  if (extreme_event) {
+    is_extreme <- rbinom(length(target), size = 1, prob = extreme_prob)
+    rec_devs   <- ifelse(is_extreme == 1,rec_devs * extreme_multiplier,rec_devs)
+  }
+  
+  target[] <- rec_devs
+  SRs[[stock_name]]@uncertainty[, ac(proj.yrs), , ss.rec, , ] <- target
+  
+  return(SRs)
+}
+
+
+
+#'*===========================================================================*
+## Build SR uncertainty scenarios ----
+#'*===========================================================================*
+
+SRs_bh_hist <- add_rec_uncertainty(
+  SRs = SRs_bh,
+  proj.yrs = proj.yrs,
+  sigmaR = sigmaR_scenarios["hist"],
+  ss.rec = ss.rec,
+  seed = 123
 )
 
-SRs_bh$ANE@params[] <- params(fit2_bh)
-
-SRs_bh$ANE@proportion[,,,1,,] <- 0
-SRs_bh$ANE@proportion[,,,2,,] <- 0
-SRs_bh$ANE@proportion[,,,3,,] <- 1
-SRs_bh$ANE@proportion[,,,4,,] <- 0
-
-SRs_bh$ANE@timelag["year", ]   <- 0
-SRs_bh$ANE@timelag["season", ] <- 2
-
-SRs_bh$ANE@uncertainty[, ac(first.yr:last.obs.yr), , ss.rec, ] <-
-  exp(residuals(fit2_bh))
-
-residsd_bh <- sqrt(
-  var(
-    log(SRs_bh$ANE@uncertainty[, ac(first.yr:last.obs.yr), , ss.rec, ]),
-    na.rm = TRUE
-  )
+SRs_bh_SS3 <- add_rec_uncertainty(
+  SRs = SRs_bh,
+  proj.yrs = proj.yrs,
+  sigmaR = sigmaR_scenarios["SS3"],
+  ss.rec = ss.rec,
+  seed = 123
 )
 
-seed <- 123
-set.seed(seed)
+SRs_bh_s05 <- add_rec_uncertainty(
+  SRs = SRs_bh,
+  proj.yrs = proj.yrs,
+  sigmaR = sigmaR_scenarios["s05"],
+  ss.rec = ss.rec,
+  seed = 123
+)
 
-SRs_bh$ANE@uncertainty[, ac(proj.yrs), , ss.rec, , ] <-
-  exp(rnorm(length(proj.yrs) * ni, 0, residsd_bh))
+SRs_bh_s07 <- add_rec_uncertainty(
+  SRs = SRs_bh,
+  proj.yrs = proj.yrs,
+  sigmaR = sigmaR_scenarios["s07"],
+  ss.rec = ss.rec,
+  seed = 123
+)
+
+SRs_bh_extreme <- add_rec_uncertainty(
+  SRs                = SRs_bh,
+  proj.yrs           = proj.yrs,
+  sigmaR             = sigmaR_scenarios["hist"],
+  ss.rec             = ss.rec,
+  seed               = 123,
+  extreme_event      = TRUE,
+  extreme_prob       = extreme_prob,
+  extreme_multiplier = extreme_multiplier_hist
+)
+
+#'*===========================================================================*
+## Save FLBEIA SR objects ----
+#'*===========================================================================*
+
+save(
+  SRs_bh_hist,
+  SRs_bh_SS3,
+  SRs_bh_s05,
+  SRs_bh_s07,
+  SRs_bh_extreme,
+  SRs_seg,
+  SRs_segBlim,
+  SRs_segBpa,
+  sigmaR_scenarios,
+  file = "data/mse/SRs_uncertainty_scenarios.RData"
+)
 
 #'*===========================================================================*
 # MAIN CONTROLS ----                                                            ----
@@ -465,6 +627,60 @@ fleets.ctrl$seasonal.share[[1]][,ac(proj.yrs),,2,] <- yearMeans(fleets.ctrl$seas
 fleets.ctrl$seasonal.share[[1]][,ac(proj.yrs),,3,] <- yearMeans(fleets.ctrl$seasonal.share[[1]][,myrs,,3,])
 fleets.ctrl$seasonal.share[[1]][,ac(proj.yrs),,4,] <- yearMeans(fleets.ctrl$seasonal.share[[1]][,myrs,,4,])
 
+#=============================================================================
+# Catch seasonal share scenarios
+#=============================================================================
+
+make_seasonal_share <- function(fleets.ctrl, fleets, stock = "ANE", proj.yrs, scenario = "recent10", ass.yr) {
+  
+  total_catch <- seasonSums(quantSums(catchWStock(fleets, stock = stock)))
+  
+  # Historical annual seasonal proportions
+  prop_hist <- fleets.ctrl$seasonal.share[[1]]
+  
+  if (scenario == "recent10") {
+    
+    yrs <- ac((ass.yr - 9):ass.yr)
+    for (s in 1:4) {prop_hist[, ac(proj.yrs), , s, ] <- yearMeans(prop_hist[, yrs, , s, ])}
+    
+  } else if (scenario == "recent3") {
+    
+    yrs <- ac((ass.yr - 2):ass.yr)
+    for (s in 1:4) {prop_hist[, ac(proj.yrs), , s, ] <- yearMeans(prop_hist[, yrs, , s, ])}
+    
+  } else if (scenario == "historical") {
+    
+    yrs <- ac(first.yr:ass.yr)
+    for (s in 1:4) {prop_hist[, ac(proj.yrs), , s, ] <- yearMeans(prop_hist[, yrs, , s, ])}
+    
+  } else if (scenario == "high_Q2Q3") {
+    
+    prop_hist[, ac(proj.yrs), , 1, ] <- 0.10
+    prop_hist[, ac(proj.yrs), , 2, ] <- 0.45
+    prop_hist[, ac(proj.yrs), , 3, ] <- 0.35
+    prop_hist[, ac(proj.yrs), , 4, ] <- 0.10
+    
+  } else {
+    stop("Unknown catch_prop scenario: ", scenario)
+  }
+  
+  fleets.ctrl$seasonal.share[[1]] <- prop_hist
+  
+  return(fleets.ctrl)
+}
+
+catch_prop_base <- "recent10"
+
+fleets.ctrl <- make_seasonal_share(
+  fleets.ctrl = fleets.ctrl,
+  fleets      = fleets,
+  stock       = "ANE",
+  proj.yrs    = proj.yrs,
+  scenario    = catch_prop_base,
+  ass.yr      = ass.yr
+) 
+
+
 #' =============================================================================
 # Completar slots de fleet en años de proyección para evitar NA estructurales
 #' =============================================================================
@@ -549,48 +765,44 @@ advice_TACNA$quota.share[["ANE"]] <- FLQuant(
 #' ============================================================
 # advice.ctrl para usar con FcapBpaHCR_ane ----
 #' ============================================================
-bh_params <- params(fit2_bh)
 
-bh_params_mat <- rbind(
-  a = as.numeric(bh_params["a", ]),
-  b = as.numeric(bh_params["b", ]))
+# Bescapement base
+Besc_base <- Bpa
 
-colnames(bh_params_mat) <- seq_len(ncol(bh_params_mat))
+# Proporción estacional
+seasonal_prop <- round(as.numeric(fleets.ctrl$seasonal.share[[1]][, ac(proj.yr), , , , 1]),5)
 
-bh_params_mat
+seasonal_prop <- seasonal_prop / sum(seasonal_prop)
 
-seasonal_prop <- round(as.numeric(fleets.ctrl$seasonal.share[[1]][, ac("2025"), , , , 1]), 5)
-seasonal_prop 
+# Reference points matrix
+ref.pts.mat <- matrix(
+  rep(ANE_ref.pts, ni),
+  nrow = length(ANE_ref.pts),
+  ncol = ni,
+  dimnames = list(names(ANE_ref.pts), 1:ni))
 
 advice_Fcap.ctrl <- list()
 
 advice_Fcap.ctrl[["ANE"]] <- list(
-  HCR.model     = "annualTAC", #"FcapBpaHCR_ane",
-  # Configuración del short-term forecast
-  nyears        = 1,
-  wts.nyears    = 3,
-  fbar.nyears   = 3,
-  f.rescale     = TRUE,
-  # Estructura temporal biológica
-  spawn.season  = 2,
-  rec.season    = 3,
-  # Límite técnico de búsqueda de F, equivalente al Fmax de SS3
-  Fcap          = 2,
-  # Proporción estacional de F
-  propf         = seasonal_prop,
-  # Modelo stock-reclutamiento
-  sr.model      = "bevholt",
-  sr.params     = bh_params_mat,
-  # Puntos de referencia
-  ref.pts       = matrix(
-    rep(ANE_ref.pts, ni),
-    nrow = length(ANE_ref.pts),
-    ncol = ni,
-    dimnames = list(names(ANE_ref.pts), 1:ni)))
-
+  HCR.model       = "annualTAC",
+  nyears          = 1,
+  wts.nyears      = 3,
+  fbar.nyears     = 3,
+  f.rescale       = TRUE,
+  spawn.season    = 2,
+  rec.season      = 3,
+  f.search.season = 1,
+  Fcap            = 2,
+  Besc            = Besc_base,
+  propf           = seasonal_prop,
+  ref.pts         = ref.pts.mat,
+  sr              = fit_bh
+)
 
 advice_Fcap.ctrl$ANE$adv.year   <- NULL
 advice_Fcap.ctrl$ANE$adv.season <- NULL
+
+
 #===============================================================================
 # GUARDAR INPUTS MSE MODULARES
 #===============================================================================
@@ -621,26 +833,156 @@ save(
   ni,
   ns,
   seed,
-  file = "data/mse/base.RData",
+  file = file.path("data/mse", paste0(experiment_name, ".RData")),
   compress = "xz"
 )
 
 #------------------------------------------------------------------------------
 # 2. STOCK-RECRUITMENT SCENARIO
 #------------------------------------------------------------------------------
+bh_params <- params(fit_bh)
 
-SRs <- SRs_bh
+bh_params_mat <- rbind(
+  a = as.numeric(bh_params["a", ]),
+  b = as.numeric(bh_params["b", ])
+)
 
-save(
-  SRs,
-  fit2_bh,
-  bh_params_mat,
-  file = "data/mse/SR_bh.RData",
-  compress = "xz"
+colnames(bh_params_mat) <- seq_len(ncol(bh_params_mat))
+
+
+SRs <- SRs_bh_hist
+save(SRs,fit_bh,bh_params_mat,sigmaR_scenarios,
+  file = "data/mse/SR_bh_hist.RData", compress = "xz")
+
+SRs <- SRs_bh_SS3
+save(SRs, fit_bh, bh_params_mat, sigmaR_scenarios,
+     file = "data/mse/SR_bh_SS3.RData", compress = "xz")
+
+SRs <- SRs_bh_s05
+save(SRs, fit_bh, bh_params_mat, sigmaR_scenarios,
+     file = "data/mse/SR_bh_s05.RData", compress = "xz")
+
+SRs <- SRs_bh_s07
+save(SRs, fit_bh, bh_params_mat, sigmaR_scenarios,
+     file = "data/mse/SR_bh_s07.RData", compress = "xz")
+
+SRs <- SRs_bh_extreme
+save(SRs, fit_bh, bh_params_mat, sigmaR_scenarios,
+     extreme_prob, extreme_multiplier_hist,
+     file = "data/mse/SR_bh_extreme.RData", compress = "xz")
+
+SRs <- SRs_seg
+save(SRs, fit_seg,
+     file = "data/mse/SR_seg.RData", compress = "xz")
+
+SRs <- SRs_segBlim
+save(SRs, fit_segBlim,
+     file = "data/mse/SR_segBlim.RData", compress = "xz")
+
+SRs <- SRs_segBpa
+save(SRs, fit_segBpa,
+     file = "data/mse/SR_segBpa.RData", compress = "xz")
+
+#------------------------------------------------------------------------------
+# Seasonal catch allocation scenarios
+#------------------------------------------------------------------------------
+
+catch_prop_values <- tibble::tribble(
+  ~catch_prop, ~Q1,    ~Q2,    ~Q3,    ~Q4,
+  "recent10",  NA,     NA,     NA,     NA,
+  "cluster_1", 0.271,  0.534,  0.164,  0.031,
+  "cluster_2", 0.238,  0.315,  0.288,  0.159,
+  "cluster_3", 0.107,  0.423,  0.370,  0.100
+)
+
+catch_prop_grid_all <- c(
+  "recent10",
+  "cluster_1",
+  "cluster_2",
+  "cluster_3"
+)
+
+catch_prop_grid_run <- c(
+  "cluster_1",
+  "cluster_2",
+  "cluster_3"
+)
+
+make_seasonal_share <- function(fleets.ctrl,
+                                proj.yrs,
+                                scenario,
+                                ass.yr,
+                                catch_prop_values) {
+  
+  prop_hist <- fleets.ctrl$seasonal.share[[1]]
+  
+  if (scenario == "recent10") {
+    
+    yrs <- ac((ass.yr - 9):ass.yr)
+    
+    for (s in 1:4) {
+      prop_hist[, ac(proj.yrs), , s, ] <-
+        yearMeans(prop_hist[, yrs, , s, ])
+    }
+    
+  } else {
+    
+    if (!scenario %in% catch_prop_values$catch_prop) {
+      stop("Unknown catch_prop scenario: ", scenario)
+    }
+    
+    prop_vec <- catch_prop_values |>
+      dplyr::filter(catch_prop == scenario) |>
+      dplyr::select(Q1, Q2, Q3, Q4) |>
+      unlist(use.names = FALSE)
+    
+    if (any(is.na(prop_vec))) {
+      stop("Missing seasonal proportions for scenario: ", scenario)
+    }
+    
+    prop_vec <- prop_vec / sum(prop_vec)
+    
+    for (s in 1:4) {
+      prop_hist[, ac(proj.yrs), , s, ] <- prop_vec[s]
+    }
+  }
+  
+  fleets.ctrl$seasonal.share[[1]] <- prop_hist
+  
+  return(fleets.ctrl)
+}
+
+# Save all seasonal allocation objects, including recent10
+dir.create("data/mse/catch_prop", recursive = TRUE, showWarnings = FALSE)
+
+for (cp in catch_prop_grid_all) {
+  
+  fleets.ctrl.cp <- make_seasonal_share(
+    fleets.ctrl       = fleets.ctrl,
+    proj.yrs          = proj.yrs,
+    scenario          = cp,
+    ass.yr            = ass.yr,
+    catch_prop_values = catch_prop_values
+  )
+  
+  save(
+    fleets.ctrl.cp,
+    file = file.path("data/mse/catch_prop", paste0("fleets_ctrl_", cp, ".RData")),
+    compress = "xz"
+  )
+}
+
+# Keep recent10 as the base case in the objects already saved above
+fleets.ctrl <- make_seasonal_share(
+  fleets.ctrl       = fleets.ctrl,
+  proj.yrs          = proj.yrs,
+  scenario          = "recent10",
+  ass.yr            = ass.yr,
+  catch_prop_values = catch_prop_values
 )
 
 #------------------------------------------------------------------------------
-# 3. OBSERVATION SCENARIO
+# Observation scenario
 #------------------------------------------------------------------------------
 
 obs.ctrl <- obs_Fcap.ctrl
@@ -652,7 +994,7 @@ save(
 )
 
 #------------------------------------------------------------------------------
-# 4. ASSESSMENT SCENARIO
+# Assessment scenario
 #------------------------------------------------------------------------------
 
 save(
@@ -662,7 +1004,7 @@ save(
 )
 
 #------------------------------------------------------------------------------
-# 5. ADVICE SCENARIO
+# Advice scenario
 #------------------------------------------------------------------------------
 
 advice.ctrl <- advice_Fcap.ctrl
@@ -679,28 +1021,63 @@ message("MSE input objects saved in data/mse/")
 # MSE scenarios
 #------------------------------------------------------------------------------
 
-Fcap_grid <- c(
-  1.00,
-  1.25,
-  1.50,
-  2.00,
-  3.00
+Fcap_grid <- c(0.75, 1.00, 1.25, 1.50, 2.00)
+
+Besc_grid <- c(5000, Bpa, 8000, 10000)
+
+SR_grid <- c(
+  "bh_hist",
+  "bh_SS3",
+  "bh_s05",
+  "bh_s07",
+  "bh_extreme"
 )
 
-Besc_grid <- c(6561)
-
-scenarios <- data.frame(
-  scenario_id = seq_along(Fcap_grid),
-  SR          = "bh",
-  obs         = "perfect",
-  assess      = "none",
-  advice      = "fcap",
-  Fcap        = Fcap_grid,
-  Besc        = Besc_grid,
-  ni          = ni,
-  proj_nyr    = proj.nyr
+scenarios <- expand.grid(
+  SR         = SR_grid,
+  Fcap       = Fcap_grid,
+  Besc       = Besc_grid,
+  catch_prop = catch_prop_grid_run,
+  KEEP.OUT.ATTRS = FALSE,
+  stringsAsFactors = FALSE
 )
 
-write.csv(scenarios,"config/scenarios.csv", row.names = FALSE)
+scenarios <- scenarios |>
+  dplyr::mutate(
+    scenario_id = dplyr::row_number(),
+    obs         = "perfect",
+    assess      = "none",
+    advice      = "fcap",
+    ni          = ni,
+    proj_nyr    = proj.nyr
+  ) |>
+  dplyr::select(
+    scenario_id,
+    SR,
+    obs,
+    assess,
+    advice,
+    Fcap,
+    Besc,
+    catch_prop,
+    ni,
+    proj_nyr
+  )
 
+stopifnot(nrow(scenarios) == length(SR_grid) *
+            length(Fcap_grid) *
+            length(Besc_grid) *
+            length(catch_prop_grid_run))
 
+stopifnot(all(scenarios$catch_prop %in% catch_prop_grid_run))
+
+message("Number of scenarios to run: ", nrow(scenarios))
+print(table(scenarios$catch_prop))
+
+dir.create("config", recursive = TRUE, showWarnings = FALSE)
+
+write.csv(
+  scenarios,
+  file = "config/scenarios.csv",
+  row.names = FALSE
+)
