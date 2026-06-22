@@ -62,7 +62,7 @@ ass.yr   <- proj.yr-1              # assessment year
   
 
 # seasons and iterations
-ni <- 200
+ni <- 1000
 ns <- 4
 
 seed <- 123
