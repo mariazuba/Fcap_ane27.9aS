@@ -26,7 +26,7 @@ source("functions/FcapBpaHCR_ane9aS.R")
 # Experiment configuration
 #===============================================================================
 
-experiment_name <- "test_100iter_10year"
+experiment_name <- "test_200iter_30year"
 
 base_file      <- file.path("data/mse", paste0(experiment_name, ".RData"))
 obs_file       <- "data/mse/obs_perfect.RData"
@@ -45,10 +45,7 @@ required_files <- c(
 missing_files <- required_files[!file.exists(required_files)]
 
 if (length(missing_files) > 0) {
-  stop(
-    "Missing required files:\n",
-    paste(missing_files, collapse = "\n")
-  )
+  stop("Missing required files:\n", paste(missing_files, collapse = "\n"))
 }
 
 load(base_file)
@@ -56,60 +53,26 @@ load(obs_file)
 load(assess_file)
 load(advice_file)
 
-scenarios <- read.csv(
-  scenarios_file,
-  stringsAsFactors = FALSE
-)
+scenarios <- read.csv(scenarios_file, stringsAsFactors = FALSE)
 
 #===============================================================================
 # Read scenario id
 #===============================================================================
-
-args <- commandArgs(trailingOnly = TRUE)
-
-if (length(args) == 0) {
-  stop("scenario_id required. Example: Rscript scripts/model.R 1")
-}
-
-scenario_id <- suppressWarnings(as.integer(args[1]))
-
-if (is.na(scenario_id)) {
-  stop("scenario_id must be an integer. Received: ", args[1])
-}
-
-sc <- scenarios[scenarios$scenario_id == scenario_id, ]
-
-if (nrow(sc) != 1) {
-  stop("scenario_id not found or duplicated: ", scenario_id)
-}
-
+args        <- commandArgs(trailingOnly = TRUE);  if (length(args) == 0) {stop("scenario_id required. Example: Rscript scripts/model.R 1")}
+scenario_id <- suppressWarnings(as.integer(args[1])); if (is.na(scenario_id)) {stop("scenario_id must be an integer. Received: ", args[1])}
+sc          <- scenarios[scenarios$scenario_id == scenario_id, ]; if (nrow(sc) != 1) {stop("scenario_id not found or duplicated: ", scenario_id)}
 #===============================================================================
 # Load scenario-specific objects
 #===============================================================================
 
-sr_file <- file.path("data/mse", paste0("SR_", sc$SR, ".RData"))
-
-if (!file.exists(sr_file)) {
-  stop("SR file not found: ", sr_file)
-}
+sr_file <- file.path("data/mse", paste0("SR_", sc$SR, ".RData")); if (!file.exists(sr_file)) {stop("SR file not found: ", sr_file)}
 
 load(sr_file)
 
 # Seasonal catch allocation object
-catch_prop_file <- file.path(
-  "data/mse/catch_prop",
-  paste0("fleets_ctrl_", sc$catch_prop, ".RData")
-)
+catch_prop_file <- file.path("data/mse/catch_prop", paste0("fleets_ctrl_", sc$catch_prop, ".RData")); if (!file.exists(catch_prop_file)) {stop("catch_prop file not found: ", catch_prop_file)}
 
-if (!file.exists(catch_prop_file)) {
-  stop("catch_prop file not found: ", catch_prop_file)
-}
-
-load(catch_prop_file)
-
-if (!exists("fleets.ctrl.cp")) {
-  stop("Object fleets.ctrl.cp not found in: ", catch_prop_file)
-}
+load(catch_prop_file); if (!exists("fleets.ctrl.cp")) {stop("Object fleets.ctrl.cp not found in: ", catch_prop_file)}
 
 fleets.ctrl <- fleets.ctrl.cp
 
@@ -133,10 +96,7 @@ advice.ctrl.i$ANE$Fcap <- Fcap_value
 advice.ctrl.i$ANE$Besc <- Besc_value
 
 # Update propf from selected fleets.ctrl
-seasonal_prop <- as.numeric(
-  fleets.ctrl$seasonal.share[[1]][, ac(proj.yr), , , , 1]
-)
-
+seasonal_prop <- as.numeric(fleets.ctrl$seasonal.share[[1]][, ac(proj.yr), , , , 1])
 seasonal_prop <- seasonal_prop / sum(seasonal_prop)
 
 advice.ctrl.i$ANE$propf <- seasonal_prop
@@ -145,12 +105,9 @@ advice.ctrl.i$ANE$propf <- seasonal_prop
 # Output name
 #===============================================================================
 
-fmt_num <- function(x, digits = 2) {
-  gsub("\\.", "p", format(round(as.numeric(x), digits), nsmall = digits))
-}
+fmt_num <- function(x, digits = 2) {gsub("\\.", "p", format(round(as.numeric(x), digits), nsmall = digits))}
 
-out_name <- sprintf(
-  "sc%03d_SR_%s_Fcap_%s_Besc_%s_CP_%s",
+out_name <- sprintf("sc%03d_SR_%s_Fcap_%s_Besc_%s_CP_%s",
   scenario_id,
   sc$SR,
   fmt_num(Fcap_value, 2),
