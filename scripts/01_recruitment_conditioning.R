@@ -633,6 +633,440 @@ save_plot(
   p_hist_vs_sim,
   "12_historical_vs_simulated_residuals.png"
 )
+
+# ------------------------------------------------------------
+# 8f. Recruitment productivity diagnostics
+# ------------------------------------------------------------
+
+sr_data <- sr_data %>%
+  mutate(
+    productivity = rec / ssb,
+    log_productivity = log(productivity),
+    productivity_roll5 = zoo::rollmean(
+      productivity,
+      k = 5,
+      fill = NA,
+      align = "center"
+    ),
+    period_2015 = ifelse(year < 2015, "Historical", "Recent")
+  )
+
+p_prod <- ggplot(sr_data, aes(year, productivity)) +
+  geom_line(alpha = 0.4) +
+  geom_point(size = 1.8) +
+  geom_line(aes(y = productivity_roll5), linewidth = 1.1) +
+  theme_bw() +
+  labs(
+    title = "Recruitment productivity",
+    subtitle = "Recruitment per unit of SSB, with 5-year moving average",
+    x = "Year",
+    y = "R / SSB"
+  )
+
+save_plot(
+  p_prod,
+  "13_productivity_R_per_SSB_roll5.png"
+)
+
+cp_prod <- changepoint::cpt.meanvar(
+  sr_data$log_productivity,
+  method = "PELT",
+  penalty = "MBIC"
+)
+
+prod_cp_table <- tibble(
+  variable = "log(R/SSB)",
+  method = "PELT mean and variance",
+  penalty = "MBIC",
+  n_changepoints = length(changepoint::cpts(cp_prod)),
+  change_year = ifelse(
+    length(changepoint::cpts(cp_prod)) == 0,
+    NA_character_,
+    paste(sr_data$year[changepoint::cpts(cp_prod)], collapse = "; ")
+  )
+)
+
+write_csv(
+  prod_cp_table,
+  file.path(tab_dir, "19_productivity_changepoints.csv")
+)
+
+period_summary <- bind_rows(
+  sr_data %>%
+    summarise(
+      period = paste0(min(year), "-", max(year)),
+      mean_R = mean(rec, na.rm = TRUE),
+      geomean_R = exp(mean(log(rec), na.rm = TRUE)),
+      cv_R = sd(rec, na.rm = TRUE) / mean(rec, na.rm = TRUE),
+      mean_prod = mean(productivity, na.rm = TRUE),
+      geomean_prod = exp(mean(log_productivity, na.rm = TRUE)),
+      cv_prod = sd(productivity, na.rm = TRUE) / mean(productivity, na.rm = TRUE),
+      n_years = n()
+    ),
+  
+  sr_data %>%
+    filter(year >= 2005) %>%
+    summarise(
+      period = "2005-present",
+      mean_R = mean(rec, na.rm = TRUE),
+      geomean_R = exp(mean(log(rec), na.rm = TRUE)),
+      cv_R = sd(rec, na.rm = TRUE) / mean(rec, na.rm = TRUE),
+      mean_prod = mean(productivity, na.rm = TRUE),
+      geomean_prod = exp(mean(log_productivity, na.rm = TRUE)),
+      cv_prod = sd(productivity, na.rm = TRUE) / mean(productivity, na.rm = TRUE),
+      n_years = n()
+    ),
+  
+  sr_data %>%
+    filter(year >= 2015) %>%
+    summarise(
+      period = "2015-present",
+      mean_R = mean(rec, na.rm = TRUE),
+      geomean_R = exp(mean(log(rec), na.rm = TRUE)),
+      cv_R = sd(rec, na.rm = TRUE) / mean(rec, na.rm = TRUE),
+      mean_prod = mean(productivity, na.rm = TRUE),
+      geomean_prod = exp(mean(log_productivity, na.rm = TRUE)),
+      cv_prod = sd(productivity, na.rm = TRUE) / mean(productivity, na.rm = TRUE),
+      n_years = n()
+    )
+)
+
+write_csv(
+  period_summary,
+  file.path(tab_dir, "20_productivity_by_period.csv")
+)
+
+prod_ttest <- t.test(
+  productivity ~ period_2015,
+  data = sr_data
+)
+
+prod_wilcox <- wilcox.test(
+  productivity ~ period_2015,
+  data = sr_data
+)
+
+productivity_tests <- tibble(
+  test = c("Welch t-test", "Wilcoxon rank-sum test"),
+  statistic = c(
+    unname(prod_ttest$statistic),
+    unname(prod_wilcox$statistic)
+  ),
+  p_value = c(
+    prod_ttest$p.value,
+    prod_wilcox$p.value
+  ),
+  interpretation = ifelse(
+    p_value < 0.05,
+    "Evidence of difference between historical and recent productivity",
+    "No evidence of difference between historical and recent productivity"
+  )
+)
+
+write_csv(
+  productivity_tests,
+  file.path(tab_dir, "21_productivity_historical_vs_recent_tests.csv")
+)
+
+# ------------------------------------------------------------
+# 8h. Density-dependence / compensation diagnostics
+# Following Hilborn & Walters: examine R/S and log(R/S) vs SSB
+# ------------------------------------------------------------
+
+sr_data <- sr_data %>%
+  mutate(
+    RPS = rec / ssb,
+    log_RPS = log(rec / ssb),
+    log_SSB = log(ssb)
+  )
+
+# Linear diagnostic: decreasing log(R/S) with SSB indicates compensation
+comp_lm <- lm(log_RPS ~ ssb, data = sr_data)
+
+comp_test <- broom::tidy(comp_lm) %>%
+  mutate(
+    interpretation = case_when(
+      term == "ssb" & estimate < 0 & p.value < 0.05 ~
+        "Evidence of compensatory density dependence",
+      term == "ssb" & estimate < 0 & p.value >= 0.05 ~
+        "Negative slope, but weak statistical evidence",
+      term == "ssb" & estimate >= 0 ~
+        "No evidence of compensatory density dependence",
+      TRUE ~ NA_character_
+    )
+  )
+
+write_csv(
+  comp_test,
+  file.path(tab_dir, "27_compensation_log_RPS_vs_SSB.csv")
+)
+
+p_rps_ssb <- ggplot(sr_data, aes(ssb, RPS)) +
+  geom_vline(xintercept = Blim, linetype = "dotted") +
+  geom_vline(xintercept = Bpa, linetype = "dashed") +
+  geom_point(size = 2) +
+  geom_smooth(method = "loess", se = TRUE, linewidth = 0.8) +
+  theme_bw() +
+  labs(
+    title = "Recruitment per spawner vs SSB",
+    subtitle = "Diagnostic for compensatory recruitment dynamics",
+    x = "SSB",
+    y = "Recruitment / SSB"
+  )
+
+save_plot(
+  p_rps_ssb,
+  "15_RPS_vs_SSB_compensation.png"
+)
+
+p_log_rps_ssb <- ggplot(sr_data, aes(ssb, log_RPS)) +
+  geom_vline(xintercept = Blim, linetype = "dotted") +
+  geom_vline(xintercept = Bpa, linetype = "dashed") +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 0.8) +
+  theme_bw() +
+  labs(
+    title = "log(R/SSB) vs SSB",
+    subtitle = "Negative slope is consistent with compensation",
+    x = "SSB",
+    y = "log(Recruitment / SSB)"
+  )
+
+save_plot(
+  p_log_rps_ssb,
+  "16_log_RPS_vs_SSB_compensation.png"
+)
+
+
+# ------------------------------------------------------------
+# 8g. Bootstrap stability of Beverton-Holt SR parameters
+# ------------------------------------------------------------
+
+nboot <- 1000
+boot_pars <- vector("list", nboot)
+
+for(i in seq_len(nboot)) {
+  
+  idx <- sample(seq_len(nrow(sr_data)), replace = TRUE)
+  
+  tmp <- sr_data[idx, ] %>%
+    arrange(year) %>%
+    mutate(boot_year = seq_len(n()))
+  
+  rec_boot <- FLQuant(
+    tmp$rec,
+    dimnames = list(
+      age = "all",
+      year = as.character(tmp$boot_year),
+      unit = "unique",
+      season = "all",
+      area = "unique",
+      iter = "1"
+    )
+  )
+  
+  ssb_boot <- FLQuant(
+    tmp$ssb,
+    dimnames = list(
+      age = "all",
+      year = as.character(tmp$boot_year),
+      unit = "unique",
+      season = "all",
+      area = "unique",
+      iter = "1"
+    )
+  )
+  
+  fit <- try({
+    mod <- FLSR(
+      rec = rec_boot,
+      ssb = ssb_boot,
+      model = bevholt
+    )
+    fmle(mod)
+  }, silent = TRUE)
+  
+  if(!inherits(fit, "try-error")) {
+    
+    pars <- as.numeric(params(fit))
+    names(pars) <- dimnames(params(fit))$params
+    
+    boot_pars[[i]] <- tibble(
+      iter = i,
+      a = pars["a"],
+      b = pars["b"],
+      logLik = as.numeric(logLik(fit)),
+      AIC = AIC(fit)
+    )
+  }
+}
+
+boot_pars <- bind_rows(boot_pars) %>%
+  filter(
+    is.finite(a),
+    is.finite(b),
+    a > 0,
+    b > 0
+  )
+
+boot_summary <- boot_pars %>%
+  summarise(
+    n_success = n(),
+    success_rate = n() / nboot,
+    a_median = median(a, na.rm = TRUE),
+    a_q05 = quantile(a, 0.05, na.rm = TRUE),
+    a_q95 = quantile(a, 0.95, na.rm = TRUE),
+    b_median = median(b, na.rm = TRUE),
+    b_q05 = quantile(b, 0.05, na.rm = TRUE),
+    b_q95 = quantile(b, 0.95, na.rm = TRUE),
+    b_q25 = quantile(b, 0.25, na.rm = TRUE),
+    b_q75 = quantile(b, 0.75, na.rm = TRUE)
+  )
+
+write_csv(
+  boot_pars,
+  file.path(tab_dir, "22_bootstrap_BH_parameters.csv")
+)
+
+write_csv(
+  boot_summary,
+  file.path(tab_dir, "23_bootstrap_BH_summary.csv")
+)
+
+p_boot_b <- ggplot(boot_pars, aes(x = b)) +
+  geom_histogram(bins = 40) +
+  geom_vline(xintercept = b_om, linetype = "dashed") +
+  theme_bw() +
+  labs(
+    title = "Bootstrap distribution of Beverton-Holt b parameter",
+    subtitle = paste0("Successful fits: ", nrow(boot_pars), " / ", nboot),
+    x = "BH b parameter",
+    y = "Frequency"
+  )
+
+save_plot(
+  p_boot_b,
+  "14_bootstrap_BH_b_parameter.png"
+)
+
+# ------------------------------------------------------------
+# 8i. Bootstrap correlation between Beverton-Holt parameters
+# ------------------------------------------------------------
+
+boot_ab_cor <- cor.test(
+  boot_pars$a,
+  boot_pars$b,
+  method = "spearman",
+  exact = FALSE
+)
+
+boot_ab_cor_table <- tibble(
+  test = "Spearman correlation between BH a and b bootstrap estimates",
+  estimate = unname(boot_ab_cor$estimate),
+  statistic = unname(boot_ab_cor$statistic),
+  p_value = boot_ab_cor$p.value,
+  interpretation = case_when(
+    abs(estimate) >= 0.7 ~ "Strong parameter correlation",
+    abs(estimate) >= 0.4 ~ "Moderate parameter correlation",
+    TRUE ~ "Weak parameter correlation"
+  )
+)
+
+write_csv(
+  boot_ab_cor_table,
+  file.path(tab_dir, "28_bootstrap_BH_a_b_correlation.csv")
+)
+
+p_boot_ab <- ggplot(boot_pars, aes(a, b)) +
+  geom_point(alpha = 0.35, size = 1.5) +
+  geom_point(aes(x = a_om, y = b_om), size = 3) +
+  theme_bw() +
+  labs(
+    title = "Bootstrap correlation between Beverton-Holt parameters",
+    subtitle = "Diagnostic for parameter uncertainty and identifiability",
+    x = "BH a parameter",
+    y = "BH b parameter"
+  )
+
+save_plot(
+  p_boot_ab,
+  "17_bootstrap_BH_a_b_correlation.png"
+)
+
+cor(boot_pars$a, boot_pars$b)
+
+# ------------------------------------------------------------
+# 8j. Contrast in spawning biomass
+# Low contrast can weaken SRR identifiability
+# ------------------------------------------------------------
+
+ssb_contrast_table <- sr_data %>%
+  summarise(
+    min_SSB = min(ssb, na.rm = TRUE),
+    q05_SSB = quantile(ssb, 0.05, na.rm = TRUE),
+    median_SSB = median(ssb, na.rm = TRUE),
+    mean_SSB = mean(ssb, na.rm = TRUE),
+    q95_SSB = quantile(ssb, 0.95, na.rm = TRUE),
+    max_SSB = max(ssb, na.rm = TRUE),
+    contrast_max_min = max_SSB / min_SSB,
+    contrast_q95_q05 = q95_SSB / q05_SSB,
+    n_years = n(),
+    interpretation = case_when(
+      contrast_q95_q05 < 2 ~
+        "Low SSB contrast; SRR parameters may be weakly identifiable",
+      contrast_q95_q05 < 4 ~
+        "Moderate SSB contrast",
+      TRUE ~
+        "High SSB contrast"
+    )
+  )
+
+write_csv(
+  ssb_contrast_table,
+  file.path(tab_dir, "29_SSB_contrast_diagnostic.csv")
+)
+
+# ------------------------------------------------------------
+# 8k. Conditioning decision table
+# ------------------------------------------------------------
+
+conditioning_decisions <- tibble(
+  question = c(
+    "Should a stock-recruitment relationship be used?",
+    "Which SR relationship should be used in the base OM?",
+    "Should recruitment deviations be lognormal?",
+    "Should recruitment deviations be autocorrelated?",
+    "Should productivity regimes be included?",
+    "Should biomass-dependent recruitment variance be included?",
+    "Should environmental covariates be included?",
+    "Should SR parameter uncertainty be explored?"
+  ),
+  diagnostic = c(
+    "Biological plausibility and SR model comparison",
+    "BH vs segmented comparison, residual diagnostics",
+    "Residual distribution, QQ plot, Shapiro-Wilk",
+    "ACF, PACF, Ljung-Box, AR(1)",
+    "Changepoint and productivity diagnostics",
+    "Absolute residuals vs SSB, biomass-class tests",
+    "No tested mechanistic environmental driver",
+    "Bootstrap BH parameters"
+  ),
+  base_OM_decision = c(
+    "Yes",
+    "Beverton-Holt",
+    "Yes",
+    "No",
+    "No",
+    "No",
+    "No",
+    "Not in base OM; use sensitivity scenarios"
+  )
+)
+
+write_csv(
+  conditioning_decisions,
+  file.path(tab_dir, "30_conditioning_decision_table.csv")
+)
 # ------------------------------------------------------------
 # 9. Proposed OM scenarios for later MSE runs
 # ------------------------------------------------------------
@@ -816,6 +1250,7 @@ p_tail <- ggplot(tail_diagnostics, aes(normal_expected, observed_residual)) +
     y = "Observed residual quantile"
   )
 
+
 save_plot(p_rec_ts, "01_historical_recruitment_timeseries.png")
 save_plot(p_sr_compare, "02_SR_curve_OM_vs_SS3_sigmaR.png")
 save_plot(p_resid_ts, "03_OM_residuals_time_series_sigmaR.png")
@@ -832,6 +1267,112 @@ png(file.path(fig_dir, "09_OM_residual_PACF.png"), width = 900, height = 700)
 pacf(rec_diag$rec_resid_om, main = "PACF of OM recruitment residuals")
 dev.off()
 
+
+# ------------------------------------------------------------
+# Residual magnitude vs SSB
+# Diagnostic for stock-size-dependent recruitment variability
+# ------------------------------------------------------------
+
+rec_diag <- rec_diag %>%
+  mutate(
+    abs_rec_resid_om = abs(rec_resid_om),
+    biomass_class = ifelse(
+      ssb < median(ssb, na.rm = TRUE),
+      "Low SSB",
+      "High SSB"
+    )
+  )
+
+p_abs_resid_ssb <- ggplot(rec_diag, aes(ssb, abs_rec_resid_om)) +
+  geom_vline(xintercept = Blim, linetype = "dotted") +
+  geom_vline(xintercept = Bpa, linetype = "dashed") +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 0.8) +
+  theme_bw() +
+  labs(
+    title = "Absolute recruitment residuals vs SSB",
+    subtitle = "Diagnostic for stock-size-dependent recruitment variability",
+    x = "SSB",
+    y = "|Recruitment residual|"
+  )
+
+save_plot(
+  p_abs_resid_ssb,
+  "06b_absolute_OM_residuals_vs_SSB.png"
+)
+
+# Spearman correlation between residual magnitude and SSB
+abs_resid_spearman <- cor.test(
+  rec_diag$abs_rec_resid_om,
+  rec_diag$ssb,
+  method = "spearman",
+  exact = FALSE
+)
+
+abs_resid_spearman_table <- tibble(
+  test = "Spearman correlation",
+  variable_x = "|recruitment residual|",
+  variable_y = "SSB",
+  statistic = unname(abs_resid_spearman$statistic),
+  estimate = unname(abs_resid_spearman$estimate),
+  p_value = abs_resid_spearman$p.value
+)
+
+write_csv(
+  abs_resid_spearman_table,
+  file.path(tab_dir, "24_abs_residuals_vs_SSB_spearman.csv")
+)
+
+abs_resid_by_biomass <- rec_diag %>%
+  group_by(biomass_class) %>%
+  summarise(
+    n = n(),
+    mean_abs_resid = mean(abs_rec_resid_om, na.rm = TRUE),
+    median_abs_resid = median(abs_rec_resid_om, na.rm = TRUE),
+    sd_abs_resid = sd(abs_rec_resid_om, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+write_csv(
+  abs_resid_by_biomass,
+  file.path(tab_dir, "25_abs_residuals_by_biomass_class.csv")
+)
+
+abs_resid_wilcox <- wilcox.test(
+  abs_rec_resid_om ~ biomass_class,
+  data = rec_diag
+)
+
+abs_resid_wilcox_table <- tibble(
+  test = "Wilcoxon rank-sum test",
+  comparison = "Absolute recruitment residuals by biomass class",
+  statistic = unname(abs_resid_wilcox$statistic),
+  p_value = abs_resid_wilcox$p.value
+)
+
+write_csv(
+  abs_resid_wilcox_table,
+  file.path(tab_dir, "26_abs_residuals_by_biomass_class_wilcox.csv")
+)
+
+p_abs_resid_box <- ggplot(
+  rec_diag,
+  aes(biomass_class, abs_rec_resid_om)
+) +
+  geom_boxplot() +
+  geom_jitter(width = 0.1, size = 2, alpha = 0.7) +
+  theme_bw() +
+  labs(
+    title = "Absolute recruitment residuals by biomass class",
+    x = "Biomass class",
+    y = "|Recruitment residual|"
+  )
+
+save_plot(
+  p_abs_resid_box,
+  "06c_absolute_residuals_by_biomass_class.png"
+)
+#############################################################################
 
 library(zoo)
 
@@ -898,6 +1439,12 @@ save(
   om_curve,
   ss3_curve,
   seg_curve,
+  prod_cp_table,
+  period_summary,
+  productivity_tests,
+  boot_pars,
+  boot_summary,
+  cp_prod,
   R0_ss3,
   h_ss3,
   SSB0_ss3,
@@ -914,3 +1461,498 @@ message("Tables saved in: ", tab_dir)
 message("Figures saved in: ", fig_dir)
 message("RData saved in: ", file.path(data_dir, "recruitment_conditioning_OM_vs_SS3.RData"))
 
+
+sr_data <- sr_data %>%
+  mutate(
+    regime =
+      ifelse(
+        productivity >
+          median(productivity),
+        "High",
+        "Low"
+      )
+  )
+
+rle_regime <- rle(sr_data$regime)
+
+tibble(
+  regime = rle_regime$values,
+  duration = rle_regime$lengths
+)
+
+tibble(
+  regime = rle_regime$values,
+  duration = rle_regime$lengths
+) %>%
+  group_by(regime) %>%
+  summarise(
+    n_runs = n(),
+    mean_duration = mean(duration),
+    max_duration = max(duration)
+  )
+
+
+# comparar BH vs Ricker vs Segmented
+
+mod_ricker <- FLSR(
+  rec = rec_fit,
+  ssb = ssb_fit,
+  model = ricker
+)
+
+fit_ricker <- fmle(mod_ricker)
+
+sr_model_comparison <- tibble(
+  model = c("Beverton-Holt", "Ricker", "Segmented"),
+  logLik = c(
+    as.numeric(logLik(fit_bh_om)),
+    as.numeric(logLik(fit_ricker)),
+    as.numeric(logLik(fit_seg))
+  ),
+  AIC = c(
+    AIC(fit_bh_om),
+    AIC(fit_ricker),
+    AIC(fit_seg)
+  )
+) %>%
+  mutate(delta_AIC = AIC - min(AIC, na.rm = TRUE))
+
+write_csv(
+  sr_model_comparison,
+  file.path(tab_dir, "31_SR_model_comparison_BH_Ricker_segmented.csv")
+)
+
+# Evaluarsi hay caída del reclutamiento total a SSB altas
+sr_high_low <- sr_data %>%
+  mutate(
+    ssb_class = ifelse(
+      ssb >= quantile(ssb, 0.75, na.rm = TRUE),
+      "High SSB",
+      "Other"
+    )
+  ) %>%
+  group_by(ssb_class) %>%
+  summarise(
+    n = n(),
+    mean_rec = mean(rec, na.rm = TRUE),
+    median_rec = median(rec, na.rm = TRUE),
+    geomean_rec = exp(mean(log(rec), na.rm = TRUE)),
+    mean_RPS = mean(RPS, na.rm = TRUE),
+    median_RPS = median(RPS, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+write_csv(
+  sr_high_low,
+  file.path(tab_dir, "32_recruitment_at_high_SSB.csv")
+)
+
+ricker_curve <- tibble(
+  ssb = ssb_grid,
+  rec_med = as.numeric(predict(fit_ricker, ssb = FLQuant(ssb_grid))),
+  model = "Ricker"
+)
+
+p_bh_ricker <- ggplot() +
+  geom_point(data = sr_data, aes(ssb, rec), size = 2, alpha = 0.7) +
+  geom_line(data = om_curve, aes(ssb, rec_med, colour = "Beverton-Holt"), linewidth = 1.1) +
+  geom_line(data = ricker_curve, aes(ssb, rec_med, colour = "Ricker"), linewidth = 1.1) +
+  geom_line(data = seg_curve, aes(ssb, rec_med, colour = "Segmented"), linewidth = 1.1, linetype = "dashed") +
+  geom_vline(xintercept = Blim, linetype = "dotted") +
+  geom_vline(xintercept = Bpa, linetype = "dashed") +
+  theme_bw() +
+  labs(
+    title = "Compensation vs overcompensation",
+    subtitle = "Comparison of Beverton-Holt, Ricker and segmented SR relationships",
+    x = "SSB",
+    y = "Recruitment",
+    colour = "Model"
+  )
+
+save_plot(
+  p_bh_ricker,
+  "18_compensation_vs_overcompensation_BH_Ricker_segmented.png"
+)
+
+
+# ------------------------------------------------------------
+# 8l. Quarterly spawner age-structure diagnostics
+# SSB in Q2 -> recruitment in Q3, same year
+# ------------------------------------------------------------
+# ============================================================
+# Helper: extract numeric FLQuant from FLBiol slot
+# ============================================================
+
+get_flq <- function(x, slot_name) {
+  
+  obj <- slot(x, slot_name)
+  
+  # If it is already an FLQuant
+  if (inherits(obj, "FLQuant")) {
+    return(obj)
+  }
+  
+  # If it is an FLQuants or list-like object
+  if (inherits(obj, "FLQuants") || is.list(obj)) {
+    return(obj[[1]])
+  }
+  
+  # If it has a slot called .Data
+  if (isS4(obj) && ".Data" %in% slotNames(obj)) {
+    return(obj@.Data[[1]])
+  }
+  
+  stop("Could not extract FLQuant from slot: ", slot_name)
+}
+
+# ============================================================
+# Quarterly spawner age structure
+# SSB_Q2(year t) -> Recruitment_Q3(year t)
+# ============================================================
+
+n_all   <- get_flq(ane_biol, "n")
+wt_all  <- get_flq(ane_biol, "wt")
+mat_all <- get_flq(ane_biol, "mat")
+
+n_q2 <- n_all[, ac(first_yr:last_obs_yr), , ss_ssb, drop = FALSE]
+wt_q2 <- wt_all[, ac(first_yr:last_obs_yr), , ss_ssb, drop = FALSE]
+mat_q2 <- mat_all[, ac(first_yr:last_obs_yr), , ss_ssb, drop = FALSE]
+
+ssb_age_q2 <- n_q2 * wt_q2 * mat_q2
+
+ssb_age_df <- as.data.frame(ssb_age_q2) %>%
+  as_tibble() %>%
+  rename(ssb_age_q2 = data) %>%
+  mutate(
+    age = as.numeric(as.character(age)),
+    year = as.numeric(as.character(year))
+  )
+
+spawner_structure_q2 <- ssb_age_df %>%
+  group_by(year) %>%
+  mutate(
+    ssb_q2_total = sum(ssb_age_q2, na.rm = TRUE),
+    prop_ssb_q2 = ssb_age_q2 / ssb_q2_total
+  ) %>%
+  summarise(
+    mean_spawner_age_q2 = sum(age * prop_ssb_q2, na.rm = TRUE),
+    prop_ssb_q2_age1 = sum(prop_ssb_q2[age == 1], na.rm = TRUE),
+    prop_ssb_q2_age2plus = sum(prop_ssb_q2[age >= 2], na.rm = TRUE),
+    ssb_q2_total = first(ssb_q2_total),
+    .groups = "drop"
+  ) %>%
+  left_join(
+    rec_diag %>%
+      select(year, rec_obs, rec_pred_om, rec_resid_om, rec_mult_om, ssb),
+    by = "year"
+  )
+
+write_csv(
+  spawner_structure_q2,
+  file.path(tab_dir, "33_spawner_age_structure_Q2_by_year.csv")
+)
+
+spawner_structure_q2
+# ============================================================
+# Maternal / spawner age-structure diagnostics
+# Q2 spawner structure -> Q3 recruitment residuals
+# ============================================================
+
+maternal_tests_q2 <- bind_rows(
+  
+  broom::tidy(
+    lm(rec_resid_om ~ mean_spawner_age_q2,
+       data = spawner_structure_q2)
+  ) %>%
+    mutate(model = "Q3 recruitment residual ~ Q2 mean spawner age"),
+  
+  broom::tidy(
+    lm(rec_resid_om ~ prop_ssb_q2_age1,
+       data = spawner_structure_q2)
+  ) %>%
+    mutate(model = "Q3 recruitment residual ~ Q2 proportion SSB age 1"),
+  
+  broom::tidy(
+    lm(rec_resid_om ~ prop_ssb_q2_age2plus,
+       data = spawner_structure_q2)
+  ) %>%
+    mutate(model = "Q3 recruitment residual ~ Q2 proportion SSB age 2+")
+)
+
+write_csv(
+  maternal_tests_q2,
+  file.path(tab_dir, "34_maternal_effects_Q2_spawners_Q3_recruitment.csv")
+)
+
+# Figure 1: mean spawner age
+p_mean_age_resid_q2 <- ggplot(
+  spawner_structure_q2,
+  aes(mean_spawner_age_q2, rec_resid_om)
+) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 0.8) +
+  theme_bw() +
+  labs(
+    title = "Q3 recruitment residuals vs Q2 mean spawner age",
+    subtitle = "Quarterly diagnostic: SSB_Q2(year t) -> Recruitment_Q3(year t)",
+    x = "Mean spawner age in Q2",
+    y = "Q3 recruitment residual"
+  )
+
+save_plot(
+  p_mean_age_resid_q2,
+  "19_Q3_recruitment_residuals_vs_Q2_mean_spawner_age.png"
+)
+
+# Figure 2: proportion of SSB from age 1
+p_prop_age1_resid_q2 <- ggplot(
+  spawner_structure_q2,
+  aes(prop_ssb_q2_age1, rec_resid_om)
+) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 0.8) +
+  theme_bw() +
+  labs(
+    title = "Q3 recruitment residuals vs Q2 proportion of SSB from age 1",
+    subtitle = "Quarterly diagnostic: young-spawner contribution in Q2",
+    x = "Proportion of Q2 SSB from age 1",
+    y = "Q3 recruitment residual"
+  )
+
+save_plot(
+  p_prop_age1_resid_q2,
+  "20_Q3_recruitment_residuals_vs_Q2_prop_SSB_age1.png"
+)
+
+# Figure 3: proportion of SSB from age 2+
+p_prop_age2plus_resid_q2 <- ggplot(
+  spawner_structure_q2,
+  aes(prop_ssb_q2_age2plus, rec_resid_om)
+) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 0.8) +
+  theme_bw() +
+  labs(
+    title = "Q3 recruitment residuals vs Q2 proportion of SSB from age 2+",
+    subtitle = "Quarterly diagnostic: older-spawner contribution in Q2",
+    x = "Proportion of Q2 SSB from age 2+",
+    y = "Q3 recruitment residual"
+  )
+
+save_plot(
+  p_prop_age2plus_resid_q2,
+  "21_Q3_recruitment_residuals_vs_Q2_prop_SSB_age2plus.png"
+)
+# ------------------------------------------------------------
+# 8n. Quarterly cohort strength diagnostics
+# Cohort strength is defined using recruitment in Q3
+# ------------------------------------------------------------
+
+cohort_strength_q3 <- rec_diag %>%
+  mutate(
+    cohort = year,
+    recruitment_season = ss_rec,
+    spawning_season = ss_ssb,
+    log_rec_q3 = log(rec_obs),
+    log_rec_q3_anom = as.numeric(scale(log_rec_q3)),
+    cohort_class = case_when(
+      log_rec_q3_anom >= 1.0  ~ "Strong Q3 cohort",
+      log_rec_q3_anom <= -1.0 ~ "Weak Q3 cohort",
+      TRUE ~ "Average Q3 cohort"
+    )
+  ) %>%
+  select(
+    cohort,
+    year,
+    spawning_season,
+    recruitment_season,
+    ssb_q2 = ssb,
+    rec_q3 = rec_obs,
+    rec_pred_om_q3 = rec_pred_om,
+    rec_resid_om_q3 = rec_resid_om,
+    rec_mult_om_q3 = rec_mult_om,
+    log_rec_q3_anom,
+    cohort_class
+  )
+
+write_csv(
+  cohort_strength_q3,
+  file.path(tab_dir, "35_Q3_cohort_strength_classification.csv")
+)
+
+cohort_summary_q3 <- cohort_strength_q3 %>%
+  group_by(cohort_class) %>%
+  summarise(
+    n = n(),
+    mean_rec_q3 = mean(rec_q3, na.rm = TRUE),
+    geomean_rec_q3 = exp(mean(log(rec_q3), na.rm = TRUE)),
+    mean_resid_q3 = mean(rec_resid_om_q3, na.rm = TRUE),
+    median_resid_q3 = median(rec_resid_om_q3, na.rm = TRUE),
+    mean_ssb_q2 = mean(ssb_q2, na.rm = TRUE),
+    median_ssb_q2 = median(ssb_q2, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+write_csv(
+  cohort_summary_q3,
+  file.path(tab_dir, "36_Q3_cohort_strength_summary.csv")
+)
+
+p_cohort_strength_q3 <- ggplot(
+  cohort_strength_q3,
+  aes(year, rec_q3)
+) +
+  geom_line(alpha = 0.4) +
+  geom_point(aes(shape = cohort_class), size = 2.3) +
+  theme_bw() +
+  labs(
+    title = "Historical recruitment cohorts in Q3",
+    subtitle = "Strong and weak cohorts based on standardized log recruitment in Q3",
+    x = "Cohort year",
+    y = "Recruitment in Q3",
+    shape = "Cohort class"
+  )
+
+save_plot(
+  p_cohort_strength_q3,
+  "21_Q3_cohort_strength_classification.png"
+)
+
+p_cohort_resid_q3 <- ggplot(
+  cohort_strength_q3,
+  aes(year, rec_resid_om_q3)
+) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_point(aes(shape = cohort_class), size = 2.3) +
+  geom_line(alpha = 0.4) +
+  theme_bw() +
+  labs(
+    title = "Q3 recruitment residuals by cohort",
+    subtitle = "Strong and weak Q3 cohorts relative to the fitted BH relationship",
+    x = "Cohort year",
+    y = "Q3 recruitment residual",
+    shape = "Cohort class"
+  )
+
+save_plot(
+  p_cohort_resid_q3,
+  "22_Q3_recruitment_residuals_by_cohort_strength.png"
+)
+
+# ------------------------------------------------------------
+# 8o. Are strong/weak Q3 cohorts associated with Q2 SSB?
+# ------------------------------------------------------------
+
+cohort_ssb_q2_summary <- cohort_strength_q3 %>%
+  group_by(cohort_class) %>%
+  summarise(
+    n = n(),
+    mean_ssb_q2 = mean(ssb_q2, na.rm = TRUE),
+    median_ssb_q2 = median(ssb_q2, na.rm = TRUE),
+    min_ssb_q2 = min(ssb_q2, na.rm = TRUE),
+    max_ssb_q2 = max(ssb_q2, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+write_csv(
+  cohort_ssb_q2_summary,
+  file.path(tab_dir, "37_Q3_cohort_strength_vs_Q2_SSB_summary.csv")
+)
+
+cohort_ssb_q2_lm <- lm(log_rec_q3_anom ~ ssb_q2, data = cohort_strength_q3)
+
+cohort_ssb_q2_lm_table <- broom::tidy(cohort_ssb_q2_lm) %>%
+  mutate(
+    model = "Standardized log recruitment Q3 ~ SSB Q2",
+    interpretation = case_when(
+      term == "ssb_q2" & p.value < 0.05 & estimate > 0 ~
+        "Positive association between Q2 SSB and Q3 cohort strength",
+      term == "ssb_q2" & p.value < 0.05 & estimate < 0 ~
+        "Negative association between Q2 SSB and Q3 cohort strength",
+      term == "ssb_q2" & p.value >= 0.05 ~
+        "No clear linear association between Q2 SSB and Q3 cohort strength",
+      TRUE ~ NA_character_
+    )
+  )
+
+write_csv(
+  cohort_ssb_q2_lm_table,
+  file.path(tab_dir, "38_Q3_cohort_strength_vs_Q2_SSB_lm.csv")
+)
+
+p_cohort_ssb_q2 <- ggplot(
+  cohort_strength_q3,
+  aes(ssb_q2, log_rec_q3_anom)
+) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = Blim, linetype = "dotted") +
+  geom_vline(xintercept = Bpa, linetype = "dashed") +
+  geom_point(aes(shape = cohort_class), size = 2.3) +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 0.8) +
+  theme_bw() +
+  labs(
+    title = "Q3 cohort strength vs Q2 SSB",
+    subtitle = "Quarterly diagnostic: SSB_Q2(year t) -> Recruitment_Q3(year t)",
+    x = "SSB in Q2",
+    y = "Standardized log recruitment in Q3",
+    shape = "Cohort class"
+  )
+
+save_plot(
+  p_cohort_ssb_q2,
+  "23_Q3_cohort_strength_vs_Q2_SSB.png"
+)
+
+# ------------------------------------------------------------
+# 8p. Updated quarterly conditioning decision table
+# ------------------------------------------------------------
+
+conditioning_decisions_quarterly <- tibble(
+  question = c(
+    "Should a stock-recruitment relationship be used?",
+    "Which SR relationship should be used in the base OM?",
+    "Should Ricker overcompensation be used?",
+    "Should recruitment deviations be lognormal?",
+    "Should recruitment deviations be autocorrelated?",
+    "Should productivity regimes be included?",
+    "Should biomass-dependent recruitment variance be included?",
+    "Should environmental covariates be included?",
+    "Should maternal or spawner-age effects be included?",
+    "Should sporadic recruitment events be included?",
+    "Should SR parameter uncertainty be explored?"
+  ),
+  quarterly_diagnostic = c(
+    "Q2 SSB linked to Q3 recruitment",
+    "BH vs segmented vs Ricker comparison using Q2 SSB and Q3 recruitment",
+    "Ricker comparison and recruitment at high Q2 SSB",
+    "Q3 recruitment residual distribution, QQ plot, Shapiro-Wilk and tail diagnostics",
+    "ACF, PACF, Ljung-Box, AR(1), runs test on Q3 recruitment residuals",
+    "Changepoint, breakpoints and productivity diagnostics using Q3 recruitment",
+    "Absolute Q3 recruitment residuals vs Q2 SSB, biomass-class tests",
+    "No tested mechanistic environmental driver",
+    "Q3 recruitment residuals vs Q2 spawner age structure",
+    "Extreme Q3 residual years and Q3 cohort strength classification",
+    "Bootstrap BH parameters using Q2 SSB and Q3 recruitment"
+  ),
+  base_OM_decision = c(
+    "Yes",
+    "Beverton-Holt",
+    "No",
+    "Yes",
+    "No",
+    "No",
+    "No",
+    "No",
+    "No, unless diagnostics show a clear relationship",
+    "No as explicit process; retained through stochastic recruitment variability",
+    "Not in base OM; use sensitivity scenarios"
+  )
+)
+
+write_csv(
+  conditioning_decisions_quarterly,
+  file.path(tab_dir, "39_conditioning_decision_table_quarterly.csv")
+)
