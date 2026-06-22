@@ -51,7 +51,7 @@ dir.create("config", recursive = TRUE, showWarnings = FALSE)
 first.yr    <- 1989  # First year of the historic data.
 last.obs.yr <- 2024 # último año del assessment / último año observado
 proj.yr     <- 2025  # first year of projection
-proj.nyr    <- 10   # Number of years in the projection period
+proj.nyr    <- 30   # Number of years in the projection period
 
 #'---- periods ----
 
@@ -62,7 +62,7 @@ ass.yr   <- proj.yr-1              # assessment year
   
 
 # seasons and iterations
-ni <- 100
+ni <- 200
 ns <- 4
 
 seed <- 123
@@ -1037,7 +1037,7 @@ scenarios <- expand.grid(
   SR         = SR_grid,
   Fcap       = Fcap_grid,
   Besc       = Besc_grid,
-  catch_prop = catch_prop_grid_run,
+  catch_prop = catch_prop_grid_all,
   KEEP.OUT.ATTRS = FALSE,
   stringsAsFactors = FALSE
 )
@@ -1067,9 +1067,9 @@ scenarios <- scenarios |>
 stopifnot(nrow(scenarios) == length(SR_grid) *
             length(Fcap_grid) *
             length(Besc_grid) *
-            length(catch_prop_grid_run))
+            length(catch_prop_grid_all))
 
-stopifnot(all(scenarios$catch_prop %in% catch_prop_grid_run))
+stopifnot(all(scenarios$catch_prop %in% catch_prop_grid_all))
 
 message("Number of scenarios to run: ", nrow(scenarios))
 print(table(scenarios$catch_prop))
@@ -1081,3 +1081,4 @@ write.csv(
   file = "config/scenarios.csv",
   row.names = FALSE
 )
+
