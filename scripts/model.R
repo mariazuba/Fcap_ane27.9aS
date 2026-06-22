@@ -26,7 +26,7 @@ source("functions/FcapBpaHCR_ane9aS.R")
 # Experiment configuration
 #===============================================================================
 
-experiment_name <- "test_200iter_30year"
+experiment_name <- "test_1000iter_30year"
 
 base_file      <- file.path("data/mse", paste0(experiment_name, ".RData"))
 obs_file       <- "data/mse/obs_perfect.RData"
