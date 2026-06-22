@@ -1,0 +1,70 @@
+---
+title: "Defining a biologically plausible range of Fcap values"
+---
+
+
+```{r setup, include=FALSE}
+library(readr)
+library(dplyr)
+library(knitr)
+
+root_dir <- "/home/maria-jose/CESGA/Fcap_ane27.9aS"
+
+fig_dir <- file.path(
+  root_dir,
+  "outputs",
+  "mse",
+  "diagnostics",
+  "fcap_biological_range"
+)
+
+
+```
+
+
+## Rationale
+
+
+The primary objective of the MSE is to identify Fcap values that satisfy the precautionary criterion:
+
+$P(SSB < B_{lim})<5%$
+
+However, stock-level performance metrics alone do not necessarily ensure that candidate Fcap values generate biologically realistic exploitation patterns.
+
+For short-lived pelagic species such as anchovy, fishing mortality can strongly influence age structure, cohort persistence and the abundance of older individuals. Elevated fishing pressure may progressively truncate population age structure, increase dependence on annual recruitment variability and reduce the demographic buffering capacity provided by older age classes (Hsieh et al., 2006; Anderson et al., 2008; Rouyer et al., 2011; Brunel and Piet, 2013).
+
+The purpose of this analysis was therefore not to identify an optimal Fcap value, but rather to define a biologically plausible range of candidate Fcap values for subsequent evaluation within the MSE framework.
+
+Candidate Fcap values were evaluated against the historical dynamics of the stock using age-specific exploitation and cohort persistence diagnostics. The underlying assumption was that biologically plausible management procedures should generate population dynamics broadly consistent with those historically experienced by the stock.
+
+
+## Diagnostic framework
+
+Four complementary diagnostics were evaluated:
+
+1. **Catch-at-age composition**, to assess whether projected catches remained consistent with the historical age structure of the fishery. ($p_a = (C_a / \sum_a C_a)$ where $C_a$ denotes catches in numbers at age). 
+2. **Age-specific exploitation**, estimated using the proxy $U_a = C_a/N_a$ where: $C_a$ is catch-at-age, $N_a$ is abundance-at-age. 
+3. **Variability of catch-at-age**, quantified through the coefficient of variation of catches by age class. ($CV=SD(C_a)/Mean(C_a)$ for each age class and Fcap scenario. 
+4. **Cohort survivorship**, based on the following indicators:
+  - $N2/N1 = N_{age2}/N_{age1}$
+  - $N3/N1 = N_{age3}/N_{age1}$
+  - $N3/N2 = N_{age3}/N_{age2}$
+  - $Nold/N1 = (N_{age2}+N_{age3})/N_{age1}$
+
+Historical reference distributions were estimated using the period 1989–2024 and compared with projected values under each candidate Fcap.
+
+## Age-specific exploitation
+
+Projected exploitation increased monotonically with increasing Fcap (**Figure 1**). Under Fcap=1.0, exploitation remainded entirely within the historical range for all age classes. A transition was observed at Fcap =1.25, where one age class exceeded the historical 95th percentile of exploitation.
+
+For Fcap values of 1.5 and above, projected exploitation exceeded the historical 95th percentile for all age classes. The maximum projected exploitation relative to the historical mean increased from approximately 1.6 times the historical average under Fcap = 1.0 to more than five times the historical average under Fcap = 3.0.
+
+These results indicate that Fcap values >= 1.5 generate exploitation patterns that fall outside the historical experience of the stock.
+
+```{r, echo=FALSE, fig.align='center', out.width='80%',fig.cap="xxx"}
+knitr::include_graphics(file.path(fig_dir, "historical_vs_projected_exploitation_proxy_at_age.png"))
+```
+
+
+
+
