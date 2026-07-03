@@ -253,17 +253,44 @@ SRs_segBpa  <- make_SRs(fit_segBpa,  "segreg",  ane, ss.rec = ss.rec, ss.ssb = s
 #'*===========================================================================*
 ## Recruitment uncertainty scenarios ----
 #'*===========================================================================*
+# 
+# # Historical residuals from base BH model
+# rec_dev_hist <- exp(residuals(fit_bh))
+# 
+# tmp_hist <- SRs_bh$ANE@uncertainty[, ac(fit_yrs), , ss.rec, , ]
+# tmp_hist[] <- as.numeric(rec_dev_hist)
+# 
+# SRs_bh$ANE@uncertainty[, ac(fit_yrs), , ss.rec, , ] <- tmp_hist
+# # Historical recruitment variability estimated from BH residuals
+# sigmaR_hist <- sd(as.numeric(residuals(fit_bh)), na.rm = TRUE)
+# # sigmaR_hist <- sqrt(var(log(SRs_bh$ANE@uncertainty[, ac(fit_yrs), , ss.rec, ]),na.rm = TRUE))
+# 
+# sigmaR_scenarios <- c(
+#   hist = sigmaR_hist,
+#   SS3  = 0.33,
+#   s05  = 0.50,
+#   s07  = 0.70
+# )
 
+#'*===========================================================================*
+## Recruitment uncertainty scenarios ----
+#'*===========================================================================*
+# sesgo corregido
 # Historical residuals from base BH model
-rec_dev_hist <- exp(residuals(fit_bh))
+resid_bh <- as.numeric(residuals(fit_bh))
+resid_bh <- resid_bh[is.finite(resid_bh)]
+
+# Historical recruitment variability estimated from BH residuals
+sigmaR_hist <- sd(resid_bh, na.rm = TRUE)
+
+# Historical multiplicative deviations, centred to mean 1
+rec_dev_hist <- exp(resid_bh)
+rec_dev_hist <- rec_dev_hist / mean(rec_dev_hist, na.rm = TRUE)
 
 tmp_hist <- SRs_bh$ANE@uncertainty[, ac(fit_yrs), , ss.rec, , ]
-tmp_hist[] <- as.numeric(rec_dev_hist)
+tmp_hist[] <- rec_dev_hist
 
 SRs_bh$ANE@uncertainty[, ac(fit_yrs), , ss.rec, , ] <- tmp_hist
-# Historical recruitment variability estimated from BH residuals
-sigmaR_hist <- sd(as.numeric(residuals(fit_bh)), na.rm = TRUE)
-# sigmaR_hist <- sqrt(var(log(SRs_bh$ANE@uncertainty[, ac(fit_yrs), , ss.rec, ]),na.rm = TRUE))
 
 sigmaR_scenarios <- c(
   hist = sigmaR_hist,
@@ -271,8 +298,6 @@ sigmaR_scenarios <- c(
   s05  = 0.50,
   s07  = 0.70
 )
-
-
 # La relación stock-reclutamiento de Beverton-Holt se mantuvo como modelo base 
 # porque es coherente con el modelo de evaluación y mostró un ajuste comparable al 
 # modelo segmentado libre. Aunque los modelos segmentados con punto de quiebre fijo
@@ -306,9 +331,10 @@ add_rec_uncertainty <- function(SRs,
                                 extreme_multiplier = 0.25) {
   
   set.seed(seed)
+  sigmaR <- as.numeric(sigmaR)
   
   target   <- SRs[[stock_name]]@uncertainty[, ac(proj.yrs), , ss.rec, , ]
-  rec_devs <- exp(rnorm(length(target), mean = 0, sd = sigmaR))
+  rec_devs <- exp(rnorm(length(target), mean = 0, sd = sigmaR)-0.5*sigmaR^2) # con correcció por sesgo
   
   if (extreme_event) {
     is_extreme <- rbinom(length(target), size = 1, prob = extreme_prob)
