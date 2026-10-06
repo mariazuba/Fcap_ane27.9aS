@@ -39,4 +39,15 @@ report/WD/report_biblio_borrar.bib
 # Previous and temporary WD versions
 report/WD/previos_borrar/
 
+# Bootstrap weight-at-age realizations
+boot/data/Watege_fun/wtatage_boot/
+
+# SS3 forecast-validation run: keep only reproducible inputs
+data/ss3_forecast_validation/*
+!data/ss3_forecast_validation/control.SS
+!data/ss3_forecast_validation/data.SS
+!data/ss3_forecast_validation/forecast.ss
+!data/ss3_forecast_validation/starter.ss
+!data/ss3_forecast_validation/wtatage.ss
+
 
