@@ -1,0 +1,4 @@
+"scenario","name","CV_source","implementation","temporal_assumption","rationale"
+"S0","Deterministic","None","CV = 0","Not applicable","Deterministic benchmark"
+"S1","Current assessment","Base 2024 SS3 forecast","CV = 0.23955","Constant contemporary precision","Current SS3 estimate of first-year forecast precision"
+"S2","Contemporary uncertainty","100 contemporary bootstrap SS3 forecasts","CV_i sampled from empirical bootstrap distribution","CV_i fixed within trajectory","Plausible variation in forecast precision under contemporary assessment conditioning"

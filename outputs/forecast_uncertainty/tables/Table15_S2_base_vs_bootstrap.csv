@@ -1,0 +1,4 @@
+"metric","base","bootstrap_percentile"
+"R_terminal_CV",0.234107580872563,0.09
+"SSB_forecast_CV",0.23955475149505,0.01
+"SSB_CV_to_R_CV_ratio",1.02326780962062,0.03
