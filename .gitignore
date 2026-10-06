@@ -50,4 +50,36 @@ data/ss3_forecast_validation/*
 !data/ss3_forecast_validation/starter.ss
 !data/ss3_forecast_validation/wtatage.ss
 
+# Intermediate and legacy MSE results
+data/mse/OM_validation_C0/
+data/mse/OM_validation_C7000/
+data/mse/diagnostics/
+data/mse/performance/
 
+Fcap_results
+
+# MSE outputs: ignore by default
+mse/*
+
+# Keep selected candidate-MP outputs
+!mse/candidate_MP_selection/
+!mse/candidate_MP_selection/**
+
+!mse/candidate_MPs/
+mse/candidate_MPs/*
+!mse/candidate_MPs/tables/
+!mse/candidate_MPs/tables/**
+
+# Keep selected robustness outputs
+!mse/robustness/
+mse/robustness/*
+!mse/robustness/design/
+!mse/robustness/design/**
+!mse/robustness/WD08_figures/
+!mse/robustness/WD08_figures/**
+
+# Regenerable OM raster figures
+outputs/OM/*.png
+
+# Regenerable bootstrap diagnostic figures
+outputs/bootstrap/
