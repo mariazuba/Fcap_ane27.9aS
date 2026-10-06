@@ -1,2 +1,22 @@
 Fcap_results
-mse
+
+# MSE outputs: ignore everything by default
+mse/*
+
+# Candidate MP selection summaries
+!mse/candidate_MP_selection/
+!mse/candidate_MP_selection/**
+
+# Candidate MP final tables
+!mse/candidate_MPs/
+mse/candidate_MPs/*
+!mse/candidate_MPs/tables/
+!mse/candidate_MPs/tables/**
+
+# Robustness outputs: retain design and WD08 figures only
+!mse/robustness/
+mse/robustness/*
+!mse/robustness/design/
+!mse/robustness/design/**
+!mse/robustness/WD08_figures/
+!mse/robustness/WD08_figures/**
