@@ -33,3 +33,8 @@ data/Rdata/assessment_error_simulated_reference.rds
 data/mse/performance_refined/refined_candidate_MP_performance.rds
 data/mse/performance_refined/refined_candidate_MP_trajectory_metrics.csv
 
+# Detailed robustness performance objects
+data/mse/robustness_performance/*/robustness_MP_performance.rds
+data/mse/robustness_performance/*/robustness_MP_trajectory_metrics.csv
+
+
