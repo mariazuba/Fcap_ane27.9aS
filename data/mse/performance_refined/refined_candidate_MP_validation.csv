@@ -1,0 +1,141 @@
+"scenario_number","scenario_id","Fcap","Besc","variable","n","n_OM","n_trajectories","first_year","last_year","n_NA","n_nonfinite","n_negative","min","max"
+1,"Fcap_1.00_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1,5000,"Recruitment",30000,100,1000,2025,2054,0,0,0,2687682.90314641,18834122.6872779
+1,"Fcap_1.00_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1,5000,"SSB",30000,100,1000,2025,2054,0,0,0,5491.86945935621,33456.6020488092
+1,"Fcap_1.00_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1,5000,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,20801.2037471407
+1,"Fcap_1.00_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1,5000,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,20801.2078361328
+1,"Fcap_1.00_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1,5000,"F advice",30000,100,1000,2025,2054,0,0,0,0,1
+2,"Fcap_1.00_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1,6561,"Recruitment",30000,100,1000,2025,2054,0,0,0,2731240.57913915,18973669.441507
+2,"Fcap_1.00_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1,6561,"SSB",30000,100,1000,2025,2054,0,0,0,5329.25602637134,33856.2429420531
+2,"Fcap_1.00_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1,6561,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,25355.8864180514
+2,"Fcap_1.00_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1,6561,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,25366.0256562689
+2,"Fcap_1.00_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1,6561,"F advice",30000,100,1000,2025,2054,0,0,0,0,1
+3,"Fcap_1.00_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1,7250,"Recruitment",30000,100,1000,2025,2054,0,0,0,2775520.23072126,19367189.4710983
+3,"Fcap_1.00_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1,7250,"SSB",30000,100,1000,2025,2054,0,0,0,4798.03383769419,33850.38044931
+3,"Fcap_1.00_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1,7250,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,28691.4441428889
+3,"Fcap_1.00_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1,7250,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,28691.4629761819
+3,"Fcap_1.00_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1,7250,"F advice",30000,100,1000,2025,2054,0,0,0,0,1
+4,"Fcap_1.00_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1,8000,"Recruitment",30000,100,1000,2025,2054,0,0,0,2775968.10187022,19366189.0041456
+4,"Fcap_1.00_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1,8000,"SSB",30000,100,1000,2025,2054,0,0,0,4859.86121387349,33876.4723483316
+4,"Fcap_1.00_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1,8000,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,28422.9995146044
+4,"Fcap_1.00_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1,8000,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,28423.0002788476
+4,"Fcap_1.00_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1,8000,"F advice",30000,100,1000,2025,2054,0,0,0,0,1
+5,"Fcap_1.25_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.25,5000,"Recruitment",30000,100,1000,2025,2054,0,0,0,2675565.73183064,18615832.0012575
+5,"Fcap_1.25_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.25,5000,"SSB",30000,100,1000,2025,2054,0,0,0,4853.70072343549,32222.6930619206
+5,"Fcap_1.25_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.25,5000,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,25199.0764951747
+5,"Fcap_1.25_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.25,5000,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,26053.6516436124
+5,"Fcap_1.25_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.25,5000,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.25
+6,"Fcap_1.25_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.25,6561,"Recruitment",30000,100,1000,2025,2054,0,0,0,2715966.28979581,18783636.3679221
+6,"Fcap_1.25_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.25,6561,"SSB",30000,100,1000,2025,2054,0,0,0,4474.92819232552,32669.3325665535
+6,"Fcap_1.25_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.25,6561,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,28020.6449891795
+6,"Fcap_1.25_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.25,6561,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,28578.5590799356
+6,"Fcap_1.25_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.25,6561,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.25
+7,"Fcap_1.25_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.25,7250,"Recruitment",30000,100,1000,2025,2054,0,0,0,2730739.48144245,19323018.9104136
+7,"Fcap_1.25_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.25,7250,"SSB",30000,100,1000,2025,2054,0,0,0,4124.01526954637,32660.6041189278
+7,"Fcap_1.25_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.25,7250,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,32568.350722784
+7,"Fcap_1.25_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.25,7250,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,33162.7731868632
+7,"Fcap_1.25_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.25,7250,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.25
+8,"Fcap_1.25_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.25,8000,"Recruitment",30000,100,1000,2025,2054,0,0,0,2782442.0288329,19321941.7851293
+8,"Fcap_1.25_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.25,8000,"SSB",30000,100,1000,2025,2054,0,0,0,4098.9518416944,32691.9461021629
+8,"Fcap_1.25_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.25,8000,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,32568.7532536013
+8,"Fcap_1.25_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.25,8000,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,33657.4086041824
+8,"Fcap_1.25_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.25,8000,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.25
+9,"Fcap_1.50_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.5,5000,"Recruitment",30000,100,1000,2025,2054,0,0,0,2656795.00292166,18415481.662737
+9,"Fcap_1.50_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.5,5000,"SSB",30000,100,1000,2025,2054,0,0,0,4058.99948358401,31164.5023981798
+9,"Fcap_1.50_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.5,5000,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,28532.7001001014
+9,"Fcap_1.50_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.5,5000,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,29252.8081597299
+9,"Fcap_1.50_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.5,5000,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.5
+10,"Fcap_1.50_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.5,6561,"Recruitment",30000,100,1000,2025,2054,0,0,0,2585604.46847517,18720535.1823785
+10,"Fcap_1.50_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.5,6561,"SSB",30000,100,1000,2025,2054,0,0,0,3777.86731439135,31700.7559946381
+10,"Fcap_1.50_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.5,6561,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,30710.9288979451
+10,"Fcap_1.50_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.5,6561,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,32041.981128097
+10,"Fcap_1.50_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.5,6561,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.5
+11,"Fcap_1.50_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.5,7250,"Recruitment",30000,100,1000,2025,2054,0,0,0,2599011.07902076,19284316.4637323
+11,"Fcap_1.50_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.5,7250,"SSB",30000,100,1000,2025,2054,0,0,0,3268.93110319059,31667.7361575237
+11,"Fcap_1.50_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.5,7250,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,36453.6228943844
+11,"Fcap_1.50_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.5,7250,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,37530.7044335316
+11,"Fcap_1.50_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.5,7250,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.5
+12,"Fcap_1.50_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.5,8000,"Recruitment",30000,100,1000,2025,2054,0,0,0,2781765.33798885,19283243.0873895
+12,"Fcap_1.50_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.5,8000,"SSB",30000,100,1000,2025,2054,0,0,0,3256.30855206983,31827.9862332536
+12,"Fcap_1.50_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.5,8000,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,37300.6678952731
+12,"Fcap_1.50_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.5,8000,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,38306.0056654324
+12,"Fcap_1.50_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.5,8000,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.5
+13,"Fcap_1.60_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.6,5000,"Recruitment",30000,100,1000,2025,2054,0,0,0,2649685.87603888,18358737.2942399
+13,"Fcap_1.60_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.6,5000,"SSB",30000,100,1000,2025,2054,0,0,0,3778.3848362064,30789.3278100921
+13,"Fcap_1.60_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.6,5000,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,29775.4292657169
+13,"Fcap_1.60_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.6,5000,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,30408.556090505
+13,"Fcap_1.60_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.6,5000,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.6
+14,"Fcap_1.60_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.6,6561,"Recruitment",30000,100,1000,2025,2054,0,0,0,2530508.53578102,18705856.2855852
+14,"Fcap_1.60_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.6,6561,"SSB",30000,100,1000,2025,2054,0,0,0,3533.67854355831,31178.2127920561
+14,"Fcap_1.60_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.6,6561,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,32190.7732132216
+14,"Fcap_1.60_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.6,6561,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,33427.6505519268
+14,"Fcap_1.60_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.6,6561,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.6
+15,"Fcap_1.60_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.6,7250,"Recruitment",30000,100,1000,2025,2054,0,0,0,2552489.12771664,19270175.111833
+15,"Fcap_1.60_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.6,7250,"SSB",30000,100,1000,2025,2054,0,0,0,2945.84897879816,31303.0107844117
+15,"Fcap_1.60_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.6,7250,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,38249.027818389
+15,"Fcap_1.60_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.6,7250,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,39247.4675206193
+15,"Fcap_1.60_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.6,7250,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.6
+16,"Fcap_1.60_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.6,8000,"Recruitment",30000,100,1000,2025,2054,0,0,0,2781471.58934267,19269111.0601984
+16,"Fcap_1.60_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.6,8000,"SSB",30000,100,1000,2025,2054,0,0,0,2929.62306042714,31538.4388364044
+16,"Fcap_1.60_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.6,8000,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,39001.819631044
+16,"Fcap_1.60_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.6,8000,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,39894.4146198357
+16,"Fcap_1.60_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.6,8000,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.6
+17,"Fcap_1.70_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.7,5000,"Recruitment",30000,100,1000,2025,2054,0,0,0,2649561.39248568,18305248.1435483
+17,"Fcap_1.70_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.7,5000,"SSB",30000,100,1000,2025,2054,0,0,0,3516.26040540961,30466.2154994472
+17,"Fcap_1.70_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.7,5000,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,30973.9259949493
+17,"Fcap_1.70_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.7,5000,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,31524.1207551907
+17,"Fcap_1.70_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.7,5000,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.7
+18,"Fcap_1.70_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.7,6561,"Recruitment",30000,100,1000,2025,2054,0,0,0,2482656.41295192,18691900.7080626
+18,"Fcap_1.70_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.7,6561,"SSB",30000,100,1000,2025,2054,0,0,0,3236.98138732599,30773.973894488
+18,"Fcap_1.70_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.7,6561,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,33635.2303380296
+18,"Fcap_1.70_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.7,6561,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,34764.6312402663
+18,"Fcap_1.70_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.7,6561,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.7
+19,"Fcap_1.70_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.7,7250,"Recruitment",30000,100,1000,2025,2054,0,0,0,2586110.90644434,19256729.6152552
+19,"Fcap_1.70_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.7,7250,"SSB",30000,100,1000,2025,2054,0,0,0,2639.62521520046,30953.2624962661
+19,"Fcap_1.70_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.7,7250,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,39996.8554300559
+19,"Fcap_1.70_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.7,7250,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,40869.2764979545
+19,"Fcap_1.70_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.7,7250,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.7
+20,"Fcap_1.70_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.7,8000,"Recruitment",30000,100,1000,2025,2054,0,0,0,2781249.47986871,19255683.6149506
+20,"Fcap_1.70_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.7,8000,"SSB",30000,100,1000,2025,2054,0,0,0,2620.75953991395,31262.9370470293
+20,"Fcap_1.70_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.7,8000,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,40550.161535798
+20,"Fcap_1.70_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.7,8000,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,41360.1062857865
+20,"Fcap_1.70_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.7,8000,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.7
+21,"Fcap_1.75_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.75,5000,"Recruitment",30000,100,1000,2025,2054,0,0,0,2649294.82571308,18279339.322486
+21,"Fcap_1.75_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.75,5000,"SSB",30000,100,1000,2025,2054,0,0,0,3397.04500592599,30349.8600873014
+21,"Fcap_1.75_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.75,5000,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,31544.5781894666
+21,"Fcap_1.75_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.75,5000,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,32055.7458143092
+21,"Fcap_1.75_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.75,5000,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.75
+22,"Fcap_1.75_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.75,6561,"Recruitment",30000,100,1000,2025,2054,0,0,0,2456233.78845782,18685177.7098527
+22,"Fcap_1.75_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.75,6561,"SSB",30000,100,1000,2025,2054,0,0,0,3089.54685656654,30608.4481221363
+22,"Fcap_1.75_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.75,6561,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,40791.9119152404
+22,"Fcap_1.75_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.75,6561,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,41607.6919337326
+22,"Fcap_1.75_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.75,6561,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.75
+23,"Fcap_1.75_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.75,7250,"Recruitment",30000,100,1000,2025,2054,0,0,0,2565600.02911664,19250247.4458659
+23,"Fcap_1.75_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.75,7250,"SSB",30000,100,1000,2025,2054,0,0,0,2499.04457386884,30784.7086789852
+23,"Fcap_1.75_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.75,7250,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,40858.1466866518
+23,"Fcap_1.75_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.75,7250,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,41669.1987868398
+23,"Fcap_1.75_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.75,7250,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.75
+24,"Fcap_1.75_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.75,8000,"Recruitment",30000,100,1000,2025,2054,0,0,0,2781136.30908041,19249211.5299143
+24,"Fcap_1.75_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.75,8000,"SSB",30000,100,1000,2025,2054,0,0,0,2477.52489984157,31129.4946829271
+24,"Fcap_1.75_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.75,8000,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,41209.5917051859
+24,"Fcap_1.75_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.75,8000,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,42054.3261430586
+24,"Fcap_1.75_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.75,8000,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.75
+25,"Fcap_1.80_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.8,5000,"Recruitment",30000,100,1000,2025,2054,0,0,0,2649104.19097248,18262487.1826452
+25,"Fcap_1.80_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.8,5000,"SSB",30000,100,1000,2025,2054,0,0,0,3281.03811277905,30235.2880218578
+25,"Fcap_1.80_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.8,5000,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,32097.4108673851
+25,"Fcap_1.80_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.8,5000,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,32575.4811391739
+25,"Fcap_1.80_Besc_5000_sigmaR_0.216_SE_reference_AE_historical",1.8,5000,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.8
+26,"Fcap_1.80_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.8,6561,"Recruitment",30000,100,1000,2025,2054,0,0,0,2431007.97797814,18678599.1389441
+26,"Fcap_1.80_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.8,6561,"SSB",30000,100,1000,2025,2054,0,0,0,2950.20305352482,30449.528523726
+26,"Fcap_1.80_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.8,6561,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,41602.8573387101
+26,"Fcap_1.80_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.8,6561,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,42361.2405614403
+26,"Fcap_1.80_Besc_6561_sigmaR_0.216_SE_reference_AE_historical",1.8,6561,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.8
+27,"Fcap_1.80_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.8,7250,"Recruitment",30000,100,1000,2025,2054,0,0,0,2545142.60047818,19243924.6781085
+27,"Fcap_1.80_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.8,7250,"SSB",30000,100,1000,2025,2054,0,0,0,2360.25866891676,30620.4133161181
+27,"Fcap_1.80_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.8,7250,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,41687.1852056087
+27,"Fcap_1.80_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.8,7250,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,42439.5892154567
+27,"Fcap_1.80_Besc_7250_sigmaR_0.216_SE_reference_AE_historical",1.8,7250,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.8
+28,"Fcap_1.80_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.8,8000,"Recruitment",30000,100,1000,2025,2054,0,0,0,2781020.99750953,19242814.0302509
+28,"Fcap_1.80_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.8,8000,"SSB",30000,100,1000,2025,2054,0,0,0,2334.61146116293,30998.988554075
+28,"Fcap_1.80_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.8,8000,"Realised catch",30000,100,1000,2025,2054,0,0,0,0,41938.9496280949
+28,"Fcap_1.80_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.8,8000,"TAC advice",30000,100,1000,2025,2054,0,0,0,0,42726.8569900406
+28,"Fcap_1.80_Besc_8000_sigmaR_0.216_SE_reference_AE_historical",1.8,8000,"F advice",30000,100,1000,2025,2054,0,0,0,0,1.8

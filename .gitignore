@@ -28,3 +28,8 @@ data/Rdata/SRs_reference_1000iter_process_error.rds
 # Simulated assessment-error realizations
 data/Rdata/assessment_error_reference_1000iter.rds
 data/Rdata/assessment_error_simulated_reference.rds
+
+# Detailed MSE performance objects
+data/mse/performance_refined/refined_candidate_MP_performance.rds
+data/mse/performance_refined/refined_candidate_MP_trajectory_metrics.csv
+
