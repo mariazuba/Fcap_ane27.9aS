@@ -1,0 +1,12 @@
+question,quarterly_diagnostic,base_OM_decision
+Should a stock-recruitment relationship be used?,Q2 SSB linked to Q3 recruitment,Yes
+Which SR relationship should be used in the base OM?,BH vs segmented vs Ricker comparison using Q2 SSB and Q3 recruitment,Beverton-Holt
+Should Ricker overcompensation be used?,Ricker comparison and recruitment at high Q2 SSB,No
+Should recruitment deviations be lognormal?,"Q3 recruitment residual distribution, QQ plot, Shapiro-Wilk and tail diagnostics",Yes
+Should recruitment deviations be autocorrelated?,"ACF, PACF, Ljung-Box, AR(1), runs test on Q3 recruitment residuals",No
+Should productivity regimes be included?,"Changepoint, breakpoints and productivity diagnostics using Q3 recruitment",No
+Should biomass-dependent recruitment variance be included?,"Absolute Q3 recruitment residuals vs Q2 SSB, biomass-class tests",No
+Should environmental covariates be included?,No tested mechanistic environmental driver,No
+Should maternal or spawner-age effects be included?,Q3 recruitment residuals vs Q2 spawner age structure,"No, unless diagnostics show a clear relationship"
+Should sporadic recruitment events be included?,Extreme Q3 residual years and Q3 cohort strength classification,No as explicit process; retained through stochastic recruitment variability
+Should SR parameter uncertainty be explored?,Bootstrap BH parameters using Q2 SSB and Q3 recruitment,Not in base OM; use sensitivity scenarios
