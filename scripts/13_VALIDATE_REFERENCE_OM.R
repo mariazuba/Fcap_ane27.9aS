@@ -1231,29 +1231,59 @@ C0_R_summary <- C0_R_year %>%
 
 C0_R_summary
 
-
 # ------------------------------------------------------------
 # 2.4.3.3 BEVERTON-HOLT RECRUITMENT PROCESS CHECK
 # ------------------------------------------------------------
 # Recruitment generated during the projection is compared with
 # the deterministic OM-specific Beverton-Holt expectation.
 #
-# log(R / R_BH) should reproduce the lognormal process-error
-# distribution parameterised by sigmaR for each conditioned OM.
+# The reference OM uses a common recruitment process-error SD,
+# defined as the median sigmaR across the 100 conditioned OMs.
+#
+# Therefore:
+#   log(R / R_BH) ~ N(-0.5 * sigmaR_ref^2, sigmaR_ref^2)
 # ------------------------------------------------------------
+
+# Common recruitment process-error SD used in the reference OM
+
+sigmaR_boot <- iteration_map_1000 %>%
+  dplyr::distinct(om, sigmaR)
+
+stopifnot(nrow(sigmaR_boot) == 100)
+stopifnot(all(is.finite(sigmaR_boot$sigmaR)))
+stopifnot(all(sigmaR_boot$sigmaR > 0))
+
+sigmaR_ref <- median(sigmaR_boot$sigmaR)
+
+# Compare realised recruitment with the deterministic
+# OM-specific Beverton-Holt expectation
 
 BH_check <- val_C0$B %>%
   filter(year %in% proj_years) %>%
-  dplyr::select(year, iter1000, om, replicate, SSB = value) %>%
+  dplyr::select(
+    year,
+    iter1000,
+    om,
+    replicate,
+    SSB = value
+  ) %>%
   left_join(
     val_C0$R %>%
       filter(year %in% proj_years) %>%
-      dplyr::select(year, iter1000, R = value),
+      dplyr::select(
+        year,
+        iter1000,
+        R = value
+      ),
     by = c("year", "iter1000")
   ) %>%
   left_join(
     iteration_map_1000 %>%
-      dplyr::select(iter1000, a, b, sigmaR),
+      dplyr::select(
+        iter1000,
+        a,
+        b
+      ),
     by = "iter1000"
   ) %>%
   mutate(
@@ -1261,51 +1291,41 @@ BH_check <- val_C0$B %>%
     log_resid = log(R / R_BH)
   )
 
-BH_check_OM <- BH_check %>%
-  group_by(om) %>%
-  summarise(
-    sigmaR = first(sigmaR),
-    observed_mean = mean(log_resid),
-    observed_sd = sd(log_resid),
-    expected_mean = -0.5 * sigmaR^2,
-    expected_sd = sigmaR,
-    mean_difference = observed_mean - expected_mean,
-    sd_difference = observed_sd - expected_sd,
-    .groups = "drop"
-  )
+# Check numerical validity
 
-BH_process_summary <- BH_check_OM %>%
-  summarise(
-    n_OM = dplyr::n(),
-    median_mean_difference = median(mean_difference),
-    q05_mean_difference = quantile(mean_difference, 0.05),
-    q95_mean_difference = quantile(mean_difference, 0.95),
-    median_sd_difference = median(sd_difference),
-    q05_sd_difference = quantile(sd_difference, 0.05),
-    q95_sd_difference = quantile(sd_difference, 0.95),
-    max_abs_mean_difference = max(abs(mean_difference)),
-    max_abs_sd_difference = max(abs(sd_difference))
-  )
-
-BH_check %>%
+BH_check_validity <- BH_check %>%
   summarise(
     n = dplyr::n(),
     n_NA = sum(is.na(log_resid)),
     n_nonfinite = sum(!is.finite(log_resid))
   )
 
-BH_process_summary %>%
-  dplyr::select(
-    max_abs_mean_difference,
-    max_abs_sd_difference
+stopifnot(BH_check_validity$n_NA == 0)
+stopifnot(BH_check_validity$n_nonfinite == 0)
+
+# Global process-error validation across the 1000 trajectories
+
+BH_process_summary <- BH_check %>%
+  summarise(
+    n = dplyr::n(),
+    n_OM = n_distinct(om),
+    n_trajectories = n_distinct(iter1000),
+    sigmaR_target = sigmaR_ref,
+    expected_mean = -0.5 * sigmaR_ref^2,
+    observed_mean = mean(log_resid),
+    mean_difference = observed_mean - expected_mean,
+    expected_sd = sigmaR_ref,
+    observed_sd = sd(log_resid),
+    sd_difference = observed_sd - expected_sd
   )
+
+print(BH_check_validity)
 
 print(C0_SSB_summary)
 
 print(C0_R_summary)
 
 print(BH_process_summary)
-
 # ============================================================
 # 2.4.4 CONTROLLED-FISHING DIAGNOSTIC
 # ============================================================
