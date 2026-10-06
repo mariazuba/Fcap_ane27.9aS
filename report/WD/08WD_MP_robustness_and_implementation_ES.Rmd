@@ -1,0 +1,426 @@
+---
+title: "Pruebas de robustez y diagnóstico de implementación de los MPs de ane.27.9aS"
+author: ""
+date: "`r format(Sys.Date(), '%d-%m-%Y')`"
+output:
+  bookdown::pdf_document2:
+    toc: false
+    number_sections: true
+    keep_tex: false
+bibliography: report_biblio.bib
+csl: ices-journal-of-marine-science.csl
+link-citations: true
+header-includes:
+- \usepackage{adjustbox}
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(here)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE,
+                      fig.align="center", out.width="95%", fig.width=8, fig.height=6)
+required_csv <- function(...) {
+  path <- here::here(...)
+  if (!file.exists(path)) stop("Required WD08 table not found: ", path)
+  # El script 31 exporta una tabla sin columnas cuando no hay señales TAC.
+  # Admitir ese caso solamente en los archivos de señales de I0 e I1.
+  empty_flags <- basename(path)=="31_TAC_flags.csv" &&
+    basename(dirname(path)) %in% c("I0","I1") &&
+    all(trimws(readLines(path, warn=FALSE)) %in% c("", '""'))
+  if (empty_flags) return(data.frame(Catch_TAC_ratio=numeric(0)))
+  read.csv(path, stringsAsFactors=FALSE, check.names=FALSE)
+}
+fmt <- function(x, digits=1) formatC(x, format="f", digits=digits)
+pct <- function(x, digits=1) fmt(100*x, digits)
+refined <- required_csv("data", "mse", "performance_refined", "refined_candidate_MP_performance_full.csv")
+selected <- required_csv("outputs", "mse", "candidate_MP_selection", "robustness", "Table25_02_MPs_selected_for_robustness.csv")
+seasonal_candidates <- required_csv("outputs", "fishery_sensitivity", "tables", "candidate_seasonal_catch_allocation_scenarios.csv")
+seasonal_clusters <- required_csv("outputs", "fishery_sensitivity", "tables", "seasonal_catch_allocation_cluster_summary.csv")
+for (k in 1:2) {
+  x <- seasonal_candidates %>% filter(scenario==paste0("cluster_",k)) %>% arrange(season)
+  target <- if(k==1) c(0.271,0.534,0.164,0.031) else c(0.235,0.309,0.299,0.157)
+  stopifnot(nrow(x)==4L, isTRUE(all.equal(round(x$prop,3),target,tolerance=1e-12)))
+}
+rob_ids <- c("R-OM", "S-C1", "S-C2", "I0", "I1")
+comparisons <- setNames(lapply(rob_ids, function(id) {
+  required_csv("outputs", "mse", "robustness", "comparison", id, "30_full_horizon_comparison.csv")
+}), rob_ids)
+flags <- setNames(lapply(rob_ids, function(id) {
+  required_csv("outputs", "mse", "robustness", "diagnostics", id, "31_TAC_flags.csv")
+}), rob_ids)
+switches <- setNames(lapply(rob_ids, function(id) {
+  required_csv("outputs", "mse", "robustness", "diagnostics", id, "31_ever_Blim_status_changes.csv")
+}), rob_ids)
+limits <- setNames(lapply(c("S-C1", "S-C2"), function(id) {
+  required_csv("outputs", "mse", "robustness", "diagnostics", id, paste0(id, "_Q2_limits_summary.csv"))
+}), c("S-C1", "S-C2"))
+annual_rob <- bind_rows(lapply(rob_ids, function(id) {
+  required_csv("outputs", "mse", "robustness", "comparison", id, "30_annual_comparison.csv")
+})) %>% filter(horizon=="Full")
+paired_summary <- bind_rows(lapply(rob_ids, function(id) {
+  required_csv("outputs", "mse", "robustness", "diagnostics", id, "31_trajectory_difference_summary.csv")
+})) %>% filter(horizon=="Full", metric=="mean_catch")
+q2_cases <- bind_rows(lapply(c("S-C1", "S-C2"), function(id) {
+  required_csv("outputs", "mse", "robustness", "diagnostics", id, paste0(id, "_Q2_capture_limits.csv")) %>%
+    mutate(robustness_id=id)
+}))
+information_direct <- required_csv("outputs", "mse", "robustness", "comparison", "I0_vs_I1", "33_full_horizon_comparison.csv")
+information_paired <- required_csv("outputs", "mse", "robustness", "comparison", "I0_vs_I1", "33_paired_catch_summary_full.csv")
+information_status <- required_csv("outputs", "mse", "robustness", "comparison", "I0_vs_I1", "33_risk_status_counts.csv")
+stopifnot(nrow(information_direct)==12L, nrow(information_paired)==12L,
+          sum(information_status$n_cases)==12000L)
+for (id in c("I0", "I1")) {
+  j <- match(information_direct$reference_scenario_id, comparisons[[id]]$reference_scenario_id)
+  stopifnot(!anyNA(j))
+  for (metric in c("mean_catch", "max_P_Blim", "mean_P_closed", "median_IAV")) {
+    stopifnot(all(abs(information_direct[[paste0(metric,"_",id)]] -
+                      comparisons[[id]][[paste0(metric,"_rob")]][j]) < 1e-8))
+  }
+}
+status_count <- function(i1, i0) sum(information_status$n_cases[information_status$ever_below_Blim_I1==i1 & information_status$ever_below_Blim_I0==i0])
+range_text <- function(x, digits=1) paste(fmt(min(x),digits), "a", fmt(max(x),digits))
+figure_dir <- here::here("outputs", "mse", "robustness", "WD08_figures")
+dir.create(figure_dir, recursive=TRUE, showWarnings=FALSE)
+save_display_plot <- function(plot, name, width=8, height=7) {
+  png_path <- file.path(figure_dir, paste0(name,".png"))
+  ggsave(png_path, plot=plot, width=width, height=height, dpi=300, bg="white")
+  ggsave(file.path(figure_dir,paste0(name,".pdf")), plot=plot,
+         width=width, height=height, bg="white")
+  knitr::include_graphics(png_path)
+}
+
+comparison_all <- bind_rows(comparisons)
+stopifnot(nrow(selected)==12L, nrow(paired_summary)==60L,
+          nrow(annual_rob)==1800L, nrow(q2_cases)==5912L)
+for (id in rob_ids) {
+  x <- comparisons[[id]]
+  j <- match(x$reference_scenario_id, refined$scenario_id)
+  stopifnot(nrow(x)==12L, !anyNA(j), all(x$robustness_id==id),
+            setequal(x$reference_scenario_id, selected$scenario_id))
+  for (metric in c("mean_catch", "max_P_Blim", "P_ever_Blim", "mean_P_closed", "median_IAV")) {
+    stopifnot(all(abs(x[[paste0(metric, "_REF")]]-refined[[metric]][j]) < 1e-8))
+  }
+}
+
+```
+
+# Objetivo y alcance
+
+El **WD07** evalúa el grid inicial y refinado bajo REF y selecciona doce MPs representativos. Este **WD08** utiliza ese mismo conjunto para responder a dos preguntas: **cómo cambian sus consecuencias al modificar hipótesis del OM o de la información, y qué explica las diferencias entre TAC aconsejado y captura realizada**. El condicionamiento, la percepción y la formulación de la regla permanecen documentados en los WDs01--06.
+
+Se presentan R-OM, S-C1, S-C2, I0 e I1, con 100 OMs, diez réplicas por OM, 1,000 trayectorias por MP y proyección 2025--2054. Cada escenario comprende doce MPs y 120 bloques. Se incorpora además la comparación directa I0 menos I1.
+
+## Continuidad con WD07 y alcance de la robustez
+
+Siguiendo la separación entre evaluación de referencia y pruebas de incertidumbre del informe IMR–PINRO 2024-17 [@Trochta2024], este WD examina las alternativas transferidas desde WD07. A diferencia de ese informe, que asume captura igual a cuota, aquí se evalúa explícitamente la captura realizada. Los escenarios de información y estacionalidad son propios de este MSE y no equivalen a sus pruebas de sesgo de campaña.
+
+Las preguntas son: ¿se mantiene el cumplimiento biológico?, ¿cambia el rendimiento o la frecuencia de cierres?, ¿son consistentes las diferencias entre trayectorias?, y ¿qué restricciones explican los desajustes de implementación? Esta secuencia conecta las figuras de desempeño con los diagnósticos, antes de discutir una elección.
+
+# Métodos y diseño
+
+La evaluación conserva los horizontes, las definiciones de performance y el criterio anual de riesgo del WD07. En particular, el riesgo realizado respecto de Blim se distingue del riesgo de forecast respecto de Besc que calcula la HCR (WD06). Las fuentes estocásticas compartidas permiten calcular diferencias para la misma combinación MP--OM--réplica; los OMs y las réplicas repetidos entre MPs no se interpretan como observaciones independientes adicionales.
+
+El script 28 verifica mapas y estructura de cada escenario; el 29 calcula performance; el 30 compara con REF; el 31 examina las dinámicas y diferencias emparejadas; el 32 comprueba los límites de Q2 en los casos señalados de captura/TAC; y el 33 compara directamente I0 con I1. La coincidencia con un límite calculado es evidencia diagnóstica, sin reemplazar una traza de ejecución ni atribuir automáticamente todo el déficit anual a una estación.
+
+## Diseño de escenarios
+
+El script 26 define el diseño y el script 27 ejecuta los bloques. Se mantienen emparejados los OMs, réplicas y errores aleatorios de las fuentes que siguen activas. REF reutiliza las simulaciones existentes.
+
+| Escenario | Cambio respecto a REF | Resultados en este WD |
+|:--|:--|:--|
+| R-OM | SD del error de reclutamiento específica del OM; mismos desvíos normales estándar | Disponibles |
+| S-C1 | Reparto de capturas Q1--Q4: 0.271, 0.534, 0.164, 0.031 | Disponibles |
+| S-C2 | Reparto de capturas Q1--Q4: 0.235, 0.309, 0.299, 0.157 | Disponibles |
+| I0 | Sin assessment error de SSB/F y forecast determinista S0 | Disponibles |
+| I1 | Assessment error histórico de SSB/F y forecast determinista S0 | Disponibles |
+
+S-C1 y S-C2 modifican el reparto estacional de capturas del OM, manteniendo el cálculo dinámico de las proporciones de F del MP. I0 frente a I1 permite aislar el efecto del assessment error; I1 frente a REF permite examinar el de forecast uncertainty. I0 frente a REF modifica ambas fuentes de información y no representa un contraste de una sola fuente.
+
+Los campos de estado del archivo de diseño corresponden al momento en que se definieron los escenarios. El estado de evaluación aquí documentado se establece mediante los outputs posteriores, no mediante esas etiquetas iniciales.
+
+## Fundamento de los escenarios y procedencia de sus parámetros
+
+La evaluación de incertidumbres del sistema de gestión se organiza por componentes [@Punt2016; @ICES2020WKGMSE3]. Estas referencias respaldan el enfoque de evaluación; los valores y alternativas específicos de ane.27.9aS proceden de los análisis propios descritos a continuación. El script 26 formaliza las decisiones en metadatos; su ejecución no modifica los objetos del OM. El script 27 aplica las modificaciones y conserva sus controles por bloque.
+
+### R-OM: variabilidad del error de proceso entre OMs
+
+El script 09 recupera la sigmaR histórica de cada OM desde el mapa de expansión del script 08. REF utiliza la mediana entre los 100 OMs como SD común de proyección. R-OM conserva la SD del OM de origen, sin sustituir sus parámetros Beverton–Holt. El diagnóstico y la distribución de estas SD se documentan en WD02; el contraste examina la consecuencia de resumir esa heterogeneidad mediante una SD común.
+
+Para el OM $o$, la réplica $r$ y el año $t$, el multiplicador de reclutamiento es
+
+$$
+m_{o,r,t}=\exp\{\sigma_o z_{o,r,t}-\tfrac12\sigma_o^2\},\qquad z_{o,r,t}\sim N(0,1).
+$$
+
+Aquí $m$ es adimensional, $\sigma_o$ es la SD del error en escala logarítmica y $z$ es el desvío normal estándar. REF sustituye $\sigma_o$ por la mediana común. Los dos escenarios reutilizan la misma matriz $z$, generada con seed 1234, y asignan los multiplicadores al reclutamiento Q3 de 2025--2054. La corrección $-\sigma^2/2$ mantiene la esperanza del multiplicador en uno.
+
+Se distinguen dos niveles: la SD y los parámetros de reclutamiento difieren entre OMs; las realizaciones $z$ difieren entre réplicas y años dentro de un OM. R-OM no introduce un régimen temporal persistente, autocorrelación nueva ni un aumento arbitrario de sigmaR. Los valores 0.50 y 0.70 de diseños exploratorios anteriores no son los parámetros de este contraste.
+
+### S-C1 y S-C2: patrones históricos de reparto de capturas
+
+El script 11 construye los vectores anuales de proporciones de captura Q1--Q4, examina tendencias y cambios temporales, y agrupa años mediante distancia euclídea sobre proporciones estandarizadas y clustering jerárquico Ward.D2. El PCA describe la variación de esos vectores; el clustering se calcula sobre las cuatro proporciones estandarizadas, no solamente sobre los dos primeros componentes. El número de grupos, $k=3$, es una elección diagnóstica fijada en el script, no el resultado de una optimización estadística del número de regímenes.
+
+Los promedios de los grupos generan alternativas de reparto de capturas. S-C1 y S-C2 trasladan al diseño de robustez los grupos 1 y 2, respectivamente. Su origen y contraste con la referencia reciente se documentan en WD03. Constituyen dos alternativas históricas al reparto recent10 de REF; los grupos no se interpretan como estados futuros con probabilidades estimadas ni como regímenes cronológicos continuos.
+
+Las proporciones se redondean a tres decimales para la implementación del script 26 y suman uno. El script 27 las aplica a `fleets.ctrl$seasonal.share` para los años de proyección, conservando el histórico hasta 2024. Son fijas entre OMs, réplicas y años en cada escenario. Esto elimina la heterogeneidad del reparto de referencia en ese contraste: se evalúa el efecto de imponer el patrón común completo, sin separar estadísticamente el cambio del promedio del cambio de dispersión. El MP mantiene `get_Fprop` y su ventana de cinco años; estas proporciones de captura no se imponen como proporciones de F.
+
+### I0 e I1: contrastes de información
+
+WD05 documenta los errores históricos de assessment de SSB y F, y WD06 la caracterización de forecast uncertainty del script 15. REF conserva ambos componentes: multiplicadores de assessment históricos y CV empírico S2. I1 conserva los multiplicadores y fija CV=0 (S0). I0 fija además los multiplicadores en uno. No se añade ni elimina error de proceso del reclutamiento en estos contrastes.
+
+I1 permite evaluar qué cambia al retirar el componente probabilístico del forecast, manteniendo la percepción con error. I0 permite comparar esa configuración con el estado sin error de assessment. La identidad del motor de proyección y de la HCR se conserva: S0 es el caso determinista de la misma regla. “Información perfecta” describe la ausencia de esos dos componentes de error, no una garantía de captura igual a TAC ni la eliminación de incertidumbre biológica.
+
+La incertidumbre del forecast se incorpora para aplicar el criterio precautorio de Fcap--Besc: seleccionar F, limitada por Fcap, de modo que la probabilidad proyectada de dejar al menos Besc de biomasa desovante sea del 95%. Este requisito de la decisión se distingue del criterio de evaluación del MSE, que exige una probabilidad anual de biomasa real bajo Blim no superior al 5%. Con CV=0, el contraste verifica el cumplimiento de Besc sobre una proyección determinista y no representa explícitamente la distribución de incertidumbre utilizada por REF.
+
+Las comparaciones definidas son I1 menos REF para forecast uncertainty, I0 menos I1 para assessment error e I0 menos REF para el efecto conjunto. No se atribuye este último a una sola fuente. Las fuentes que siguen activas conservan sus mapas y realizaciones emparejadas; fijar CV=0 no requiere una nueva seed.
+
+# Resultados
+
+## Evidencia utilizada para configurar los escenarios estacionales
+
+La Tabla \@ref(tab:seasonal-scenario-origin) presenta los promedios históricos y los valores implementados. La correspondencia entre los CSV del script 11 y los vectores del diseño se verifica al leer el documento. Este control comprueba la procedencia numérica; no valida que esos patrones describan el futuro.
+
+```{r seasonal-scenario-origin}
+seasonal_origin <- seasonal_candidates %>% filter(scenario %in% c("cluster_1","cluster_2")) %>% mutate(cluster=as.integer(sub("cluster_","",scenario))) %>% left_join(seasonal_clusters %>% select(cluster,season,n_years),by=c("cluster","season")) %>% arrange(cluster,season) %>% transmute(Escenario=ifelse(cluster==1,"S-C1","S-C2"), Trimestre=season, `Media histórica`=fmt(prop,6), Implementado=fmt(round(prop,3),3), `Años del grupo`=n_years)
+knitr::kable(seasonal_origin, caption="Origen de S-C1 y S-C2: medias de los grupos históricos de 1989--2024 y proporciones fijas implementadas para 2025--2054. Proporciones adimensionales.", booktabs=TRUE)
+```
+
+## Comparaciones disponibles con REF
+
+Los scripts 28--31 realizan la validación, evaluación, comparación y diagnóstico, respectivamente, seleccionando el escenario mediante variables de entorno. Cada comparación contiene doce MPs y cuatro horizontes, con 48,000 filas emparejadas MP--trayectoria--horizonte. Las siguientes tablas usan el horizonte Full y diferencias robustez menos REF. Captura y delta captura se expresan en t/año; los cambios en cierres se expresan en puntos porcentuales (pp).
+
+```{r robustness-comparisons, results="asis"}
+for (id in rob_ids) {
+  x <- comparisons[[id]]
+  x <- x[order(x$Fcap,x$Besc), ]
+  cat("\n\n")
+  out <- data.frame(MP=x$reference_scenario_number,
+                    `Riesgo (%)`=pct(x$max_P_Blim_rob),
+                    `Captura`=fmt(x$mean_catch_rob,0),
+                    `Delta captura`=fmt(x$mean_catch_delta,0),
+                    `Delta cierres (pp)`=fmt(100*x$mean_P_closed_delta,2),
+                    `Delta IAV`=fmt(x$median_IAV_delta,3),check.names=FALSE)
+  print(knitr::kable(out, caption=paste("Comparación",id,"con REF, 2025--2054."),
+                     label=paste0("comparison-", id),
+                     booktabs=TRUE, longtable=TRUE))
+}
+```
+
+Los doce MPs cumplen el criterio anual del 5% en los cinco escenarios (Tablas \@ref(tab:comparison-R-OM), \@ref(tab:comparison-S-C1), \@ref(tab:comparison-S-C2), \@ref(tab:comparison-I0) y \@ref(tab:comparison-I1)).
+
+**R-OM.** Las diferencias de captura media respecto de REF van de `r range_text(comparisons[["R-OM"]]$mean_catch_delta)` t/año.
+
+**S-C1.** La captura media aumenta en diez MPs y disminuye en dos, correspondientes a Besc=8000 t y Fcap=1.70 o 1.80. Las diferencias van de `r range_text(comparisons[["S-C1"]]$mean_catch_delta)` t/año. La proporción media anual de cierres disminuye entre `r range_text(-100*comparisons[["S-C1"]]$mean_P_closed_delta,2)` puntos porcentuales. La mediana de IAV y el riesgo anual máximo bajo Blim son inferiores a REF en los doce MPs.
+
+**S-C2.** La captura media disminuye entre `r range_text(-comparisons[["S-C2"]]$mean_catch_delta)` t/año en los doce MPs. La mediana de IAV aumenta en todos ellos. La proporción media anual de cierres aumenta en diez MPs y disminuye en dos. El riesgo anual máximo permanece igual al de REF en nueve MPs, disminuye en uno y aumenta en dos. El máximo entre los doce MPs es `r pct(max(comparisons[["S-C2"]]$max_P_Blim_rob))`%.
+
+**I0.** La captura media supera REF entre `r range_text(comparisons[["I0"]]$mean_catch_delta)` t/año. La proporción media anual de cierres y la mediana de IAV son inferiores a REF en los doce MPs. El máximo anual de riesgo bajo Blim es `r pct(max(comparisons[["I0"]]$max_P_Blim_rob))`%.
+
+**I1.** La captura media supera REF entre `r range_text(comparisons[["I1"]]$mean_catch_delta)` t/año. La proporción media anual de cierres y la mediana de IAV son inferiores a REF en los doce MPs. El máximo anual de riesgo bajo Blim es `r pct(max(comparisons[["I1"]]$max_P_Blim_rob))`%.
+
+```{r risk-status-switches}
+st <- bind_rows(lapply(rob_ids, function(id) {
+  x <- switches[[id]]
+  data.frame(Escenario=id,
+             `REF no, robustez sí`=sum(!x$ever_below_REF & x$ever_below_rob),
+             `REF sí, robustez no`=sum(x$ever_below_REF & !x$ever_below_rob),
+             check.names=FALSE)
+}))
+knitr::kable(st, caption="Cambios de estado: alguna vez por debajo de Blim durante 2025--2054.", booktabs=TRUE)
+```
+
+Los recuentos son casos **MP--trayectoria**, no trayectorias únicas del ensemble ni años. Un mismo identificador puede aparecer en varios MPs. S-C1 presenta 203 casos que dejan de estar alguna vez por debajo del límite y uno que pasa a estarlo. S-C2 presenta 93 casos nuevos y 49 que dejan de estarlo. I0 presenta tres casos nuevos y 221 que dejan de estar bajo Blim; I1 presenta seis casos nuevos y 221 que dejan de estarlo (Tabla \@ref(tab:risk-status-switches)).
+
+
+## Cambios de desempeño y su dispersión
+
+```{r robustness-catch-change, fig.height=6, fig.cap="Cambio de captura media anual respecto de REF por MP y escenario. Una barra positiva indica mayor captura en robustez. Los IDs corresponden al grid refinado del WD07."}
+save_display_plot({
+ggplot(comparison_all, aes(factor(reference_scenario_number), mean_catch_delta,
+                          fill=factor(Besc))) +
+  geom_col() + geom_hline(yintercept=0, colour="#636363") +
+  facet_wrap(~robustness_id, ncol=1, scales="free_y") +
+  labs(x="MP", y="Delta captura (t/año)", fill="Besc (t)") +
+  scale_fill_brewer(palette="Blues") + theme_bw(base_size=11)
+}, "robustness-catch-change", height=9)
+```
+
+La Figura \@ref(fig:robustness-catch-change) presenta las diferencias de captura respecto de REF. Los paneles utilizan escalas verticales por escenario.
+
+```{r robustness-paired-catch, fig.height=7, fig.cap="Diferencias emparejadas de captura media por trayectoria: robustez menos REF. Punto: mediana; línea: P05--P95 entre las 1,000 diferencias por MP. No son intervalos de confianza de la media."}
+save_display_plot({
+ggplot(paired_summary, aes(factor(reference_scenario_number), median_delta,
+                          colour=factor(Besc))) +
+  geom_linerange(aes(ymin=p05_delta, ymax=p95_delta)) + geom_point(size=2) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  facet_wrap(~robustness_id, ncol=1, scales="free_y") +
+  labs(x="MP", y="Delta captura por trayectoria (t/año)", colour="Besc (t)") +
+  scale_colour_brewer(palette="Dark2") + theme_bw(base_size=11)
+}, "robustness-paired-catch", height=9)
+```
+
+La Figura \@ref(fig:robustness-paired-catch) presenta la mediana y los percentiles 5 y 95 de las diferencias por trayectoria. Los percentiles describen la distribución de las 1,000 diferencias de cada MP.
+
+```{r robustness-closure-iav-change, fig.height=7, fig.cap="Cambios respecto de REF en frecuencia media de cierre e IAV mediano. Paneles separados por métrica y escenario; no se comparan las unidades de ambas métricas."}
+save_display_plot({
+change_long <- comparison_all %>%
+  transmute(robustness_id, reference_scenario_number, Besc,
+            `Delta cierres (pp)`=100*mean_P_closed_delta, `Delta IAV`=median_IAV_delta) %>%
+  pivot_longer(cols=c(`Delta cierres (pp)`, `Delta IAV`), names_to="metric", values_to="value")
+ggplot(change_long, aes(factor(reference_scenario_number), value, fill=factor(Besc))) +
+  geom_col() + geom_hline(yintercept=0, colour="#636363") +
+  facet_wrap(~metric+robustness_id, ncol=3, scales="free_y") +
+  labs(x="MP", y=NULL, fill="Besc (t)") + scale_fill_brewer(palette="Blues") +
+  theme_bw(base_size=11)
+}, "robustness-closure-iav-change", height=10)
+```
+
+La Figura \@ref(fig:robustness-closure-iav-change) presenta los cambios de cierres en puntos porcentuales y los cambios de IAV en sus unidades adimensionales.
+
+## Localización temporal de los cambios
+
+```{r robustness-annual-catch-delta, fig.height=8, fig.cap="Cambio anual en captura media: robustez menos REF. Colores: Fcap; columnas: Besc; filas: escenario. Las escalas verticales varían entre escenarios."}
+save_display_plot({
+ggplot(annual_rob, aes(year, mean_catch_delta, colour=factor(Fcap))) +
+  geom_hline(yintercept=0, linetype="dashed", colour="#636363") +
+  geom_line(linewidth=0.55) +
+  facet_grid(robustness_id ~ Besc, scales="free_y") +
+  labs(x="Año", y="Delta captura (t/año)", colour="Fcap") +
+  scale_colour_brewer(palette="Dark2") + theme_bw(base_size=10)
+}, "robustness-annual-catch-delta", height=10)
+```
+
+La Figura \@ref(fig:robustness-annual-catch-delta) presenta las diferencias anuales de captura durante 2025--2054. Las tablas de comparación conservan los cuatro horizontes.
+
+```{r robustness-annual-risk-delta, fig.height=8, fig.cap="Cambio en probabilidad anual de SSB por debajo de Blim, expresado en puntos porcentuales: robustez menos REF. No representa la probabilidad acumulada en 30 años."}
+save_display_plot({
+ggplot(annual_rob, aes(year, 100*P_Blim_delta, colour=factor(Fcap))) +
+  geom_hline(yintercept=0, linetype="dashed", colour="#636363") +
+  geom_line(linewidth=0.55) + facet_grid(robustness_id ~ Besc, scales="free_y") +
+  labs(x="Año", y="Delta P(SSB < Blim) (pp)", colour="Fcap") +
+  scale_colour_brewer(palette="Dark2") + theme_bw(base_size=10)
+}, "robustness-annual-risk-delta", height=10)
+```
+
+La Figura \@ref(fig:robustness-annual-risk-delta) presenta las diferencias anuales de probabilidad bajo Blim en puntos porcentuales.
+
+## Comparación directa I0 menos I1
+
+Con forecast determinista en ambos escenarios, la captura media en I0 es entre `r range_text(-information_direct$mean_catch_delta)` t/año inferior a I1. La proporción media anual de cierres disminuye entre `r range_text(-100*information_direct$mean_P_closed_delta,3)` puntos porcentuales y la mediana de IAV disminuye entre `r range_text(-information_direct$median_IAV_delta,4)` (Tabla \@ref(tab:information-direct)).
+
+```{r information-direct}
+x <- information_direct %>% arrange(Fcap,Besc)
+out <- data.frame(MP=x$reference_scenario_number,
+                  `Captura I0`=fmt(x$mean_catch_I0,1),
+                  `Captura I1`=fmt(x$mean_catch_I1,1),
+                  `Delta captura`=fmt(x$mean_catch_delta,1),
+                  `Delta cierres (pp)`=fmt(100*x$mean_P_closed_delta,3),
+                  `Delta IAV`=fmt(x$median_IAV_delta,4),check.names=FALSE)
+knitr::kable(out, caption="Comparación directa I0 menos I1, horizonte Full. Capturas y diferencias de captura en t/año; diferencias de cierres en puntos porcentuales; IAV adimensional.", booktabs=TRUE)
+```
+
+La captura media por trayectoria en I0 es inferior a I1 en `r range_text(100*information_paired$fraction_negative)`% de las trayectorias, según el MP. Los percentiles 5 y 95 de las diferencias incluyen valores negativos y positivos en los doce MPs (Figura \@ref(fig:information-paired-catch)).
+
+```{r information-paired-catch, fig.cap="Diferencias de captura media por trayectoria: I0 menos I1. Punto: mediana; línea: percentiles 5--95 de las 1,000 diferencias de cada MP. Los percentiles no son intervalos de confianza."}
+save_display_plot({
+ggplot(information_paired,aes(factor(reference_scenario_number),median_delta,colour=factor(Besc))) +
+  geom_linerange(aes(ymin=p05_delta,ymax=p95_delta)) + geom_point(size=2) +
+  geom_hline(yintercept=0,linetype="dashed") +
+  labs(x="MP",y="Delta captura (t/año)",colour="Besc (t)") + theme_bw(base_size=11)
+}, "information-paired-catch", height=6)
+```
+
+De los `r sum(information_status$n_cases)` casos MP--trayectoria, `r status_count(FALSE,FALSE)` no están bajo Blim en ninguno de los escenarios, `r status_count(TRUE,TRUE)` están bajo Blim en ambos y `r status_count(TRUE,FALSE)` solamente en I1. El número de casos bajo Blim solamente en I0 es `r status_count(FALSE,TRUE)` (Tabla \@ref(tab:information-risk-status)).
+
+```{r information-risk-status}
+out <- information_status %>% transmute(`Alguna vez bajo Blim en I1`=ifelse(ever_below_Blim_I1,"Sí","No"),
+                                       `Alguna vez bajo Blim en I0`=ifelse(ever_below_Blim_I0,"Sí","No"),
+                                       Casos=n_cases)
+knitr::kable(out,caption="Estado bajo Blim en la comparación directa I0--I1 durante 2025--2054. Recuento de casos MP--trayectoria.",booktabs=TRUE)
+```
+
+## Implementación estacional: captura, capacidad y TAC
+
+El script 32 comprueba Q2 en todos los casos con diferencia anual captura/TAC superior al 5%, conserva sus identificadores y guarda tablas reproducibles. En los objetos examinados, `catch.threshold` es 0.9 y la capacidad estacional es 5,000 unidades de esfuerzo. Este valor de capacidad no es una cuota de captura ni una mortalidad por pesca.
+
+El código inspeccionado de `Baranov` limita la captura calculada por edad mediante $\rho N_a W_a$. Por separado, `CorrectCatch` compara las capturas en número por edad con $\rho N_a\exp(-M_a/2)$. Para el OM sin descartes y los pesos de desembarque utilizados, el límite agregado diagnóstico de Q2 es
+
+$$
+L_{Q2}=\sum_a 0.9\,N_{a,Q2}\exp(-M_{a,Q2}/2)\,W_{a,Q2}.
+$$
+
+Por tanto, 0.9 no significa que se capture el 90% del TAC anual. El esfuerzo requerido por `Baranov.effort` puede superar la capacidad y `capacityRest.SMFB` lo recorta. Alcanzar la capacidad y alcanzar el límite de captura son diagnósticos distintos y pueden coincidir.
+
+```{r seasonal-limit-summary}
+lt <- bind_rows(lapply(names(limits), function(id) {
+  x <- limits[[id]]
+  data.frame(Escenario=id,
+             Dirección=ifelse(x$direction=="Below TAC","Bajo TAC","Sobre TAC"),
+             `En límite Q2`=ifelse(x$at_catch_limit,"Sí","No"),
+             `En capacidad Q2`=ifelse(x$at_capacity,"Sí","No"),
+             Casos=x$n_cases,check.names=FALSE)
+}))
+knitr::kable(lt, caption="Diagnóstico de Q2 en casos con diferencia anual captura/TAC mayor del 5%.", booktabs=TRUE)
+```
+
+En S-C1, los 5,903 casos por debajo del TAC coinciden con el límite calculado de Q2: 2,308 sin esfuerzo en capacidad y 3,595 con esfuerzo en capacidad. Los otros cinco casos son capturas superiores al TAC. En el caso con menor cociente anual captura/TAC (MP 28, bloque 9, 2031, trayectoria 849), el TAC nominal de Q2 es aproximadamente 13,934.5 t; la captura realizada de Q2 y el límite con mortalidad natural coinciden en 6,160.262 t, con esfuerzo y capacidad iguales a 5,000. El límite sin el factor $\exp(-M/2)$ es 7,717.366 t y no representa el límite diagnóstico de `CorrectCatch`.
+
+La Tabla \@ref(tab:seasonal-limit-summary) contiene los casos seleccionados por desviación anual captura/TAC superior al 5%.
+
+En S-C2, ninguno de los cuatro casos señalados coincide con el límite de captura o capacidad de Q2. Tres tienen captura superior al TAC y uno tiene una diferencia captura menos TAC de -0.272 t.
+
+```{r tac-flag-summary}
+ft <- bind_rows(lapply(rob_ids, function(id) {
+  x <- flags[[id]]
+  data.frame(Escenario=id, Casos=nrow(x),
+             `Bajo TAC`=sum(x$Catch_TAC_ratio<1),
+             `Sobre TAC`=sum(x$Catch_TAC_ratio>1),check.names=FALSE)
+}))
+knitr::kable(ft, caption="Señales anuales captura/TAC mayores del 5% en robustez.", booktabs=TRUE)
+```
+
+Los cinco excesos de S-C1 van de 0.083 a 0.237 t y los tres de S-C2 de 0.050 a 0.115 t. Todos corresponden a la rama de F reducido. I0 e I1 no presentan casos con desviación anual captura/TAC superior al 5% (Tabla \@ref(tab:tac-flag-summary)).
+
+
+```{r robustness-q2-limits, fig.height=5, fig.cap="Captura realizada de Q2 frente al límite diagnóstico que incluye mortalidad natural, en los casos con diferencia anual captura/TAC mayor del 5%. La diagonal representa igualdad. El panel S-C2 tiene solo cuatro casos; los puntos de S-C1 pueden superponerse."}
+save_display_plot({
+ggplot(q2_cases, aes(limit_Q2, catch_Q2, colour=at_capacity)) +
+  geom_abline(slope=1, intercept=0, linetype="dashed") +
+  geom_point(alpha=0.3, size=1.5) + facet_wrap(~robustness_id, scales="free") +
+  labs(x="Límite diagnóstico Q2 (t)", y="Captura realizada Q2 (t)",
+       colour="En capacidad Q2") + theme_bw(base_size=11)
+}, "robustness-q2-limits", height=6)
+```
+
+La Figura \@ref(fig:robustness-q2-limits) presenta la captura de Q2 y su límite diagnóstico para los casos seleccionados.
+
+# Discusión y límites de interpretación
+
+El contraste I1 menos REF retira la distribución de incertidumbre del forecast y mantiene el error de evaluación. El contraste I0 menos I1 retira adicionalmente el error de evaluación bajo forecast determinista. Las diferencias de captura, cierres e IAV del primer contraste exceden las del segundo en los doce MPs. Este resultado se refiere a las configuraciones y fuentes de error evaluadas; no cuantifica el efecto del error de evaluación bajo el forecast probabilístico de REF.
+
+La incorporación de incertidumbre al forecast responde al criterio precautorio de la decisión Fcap--Besc. Los resultados de I0 e I1 muestran las consecuencias de retirarla; no sustituyen ese requisito por el cumplimiento observado del riesgo bajo Blim. Besc es el umbral de escape utilizado por la regla y Blim es el umbral utilizado para evaluar el riesgo biológico realizado.
+
+S-C1 y S-C2 evalúan la configuración completa del sistema implementado. La coincidencia entre captura de Q2 y su límite diagnóstico no identifica por separado la contribución del reparto estacional y la de las restricciones de captura. El análisis de límites está condicionado a las señales anuales superiores al 5%; no estima la frecuencia de los límites entre todas las observaciones ni descarta restricciones en otros trimestres. No se ha verificado la causa numérica de los excesos de captura sobre TAC.
+
+El diseño no asigna probabilidades a los escenarios ni pesos a captura, cierres o IAV. La comparación no establece un ranking único ni selecciona un MP final.
+
+# Trazabilidad y reproducibilidad
+
+Las tablas y figuras se reconstruyen desde `outputs/mse/robustness/comparison/` y `outputs/mse/robustness/diagnostics/`, junto con la selección del WD07. No se ejecutan nuevas simulaciones al renderizar. Las figuras se guardan en PNG y PDF en `outputs/mse/robustness/WD08_figures/` y se insertan mediante `knitr::include_graphics()`. El script 33 guarda la comparación directa I0 menos I1 en `outputs/mse/robustness/comparison/I0_vs_I1/`. Las comprobaciones verifican que los doce baselines de las comparaciones coinciden con la performance REF del grid refinado. El documento se detiene si falta un CSV necesario.
+
+La regeneración de las métricas requiere los bloques y mapas de `data/mse/robustness_runs/`, los inputs compartidos y los outputs de los scripts 28--29. Los paquetes utilizados contienen las tablas de comparación y diagnóstico de los cinco escenarios, y las tablas de performance de I0 e I1. La regeneración completa requiere conservar las salidas de validación y performance de cada escenario en el proyecto.
+
+El script 32 selecciona S-C1 o S-C2 mediante `MSE_LIMITS_ROBUSTNESS_ID`. Conserva el umbral y las dimensiones de control almacenados en cada bloque para emparejar las iteraciones globales y locales. Sus tablas permiten reproducir el diagnóstico que inicialmente se examinó en consola.
+
+# Conclusiones
+
+- Los doce MPs cumplen el criterio de probabilidad anual bajo Blim no superior al 5% en R-OM, S-C1, S-C2, I0 e I1.
+- I0 e I1 presentan mayor captura media y menor proporción media anual de cierres y mediana de IAV que REF en los doce MPs.
+- En la comparación directa I0 menos I1, la captura media disminuye entre `r range_text(-information_direct$mean_catch_delta)` t/año. Tres casos MP--trayectoria están bajo Blim solamente en I1; ninguno está solamente en I0.
+- En S-C1, 5,903 casos por debajo del TAC coinciden con el límite diagnóstico de Q2. En S-C2, ninguno de los cuatro casos señalados coincide con el límite de captura o capacidad de Q2.
+- El requisito probabilístico de escape de Fcap--Besc y el criterio anual de riesgo bajo Blim corresponden a etapas distintas: decisión y evaluación, respectivamente.
+
+# Referencias

@@ -1,0 +1,11 @@
+
+Currently Loaded Modules:
+  1) cesga/system (S)   2) miniconda3/22.11.1-1 (Comp)   3) R/4.4.2 (Bio)
+
+  Where:
+   Bio:   Bioinformatics (key: area_bioinformatics)
+   Comp:  Compiler (key: area_compiler)
+   S:     Module is Sticky, requires --force to unload or purge
+
+ 
+

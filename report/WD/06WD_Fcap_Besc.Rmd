@@ -1,0 +1,1005 @@
+---
+title: "Management Procedure $F_{cap}$--$B_{esc}$ para ane.27.9aS"
+author:
+  - "María José Zúñiga Basualto"
+  - "Fernando Ramos"
+  - "María Ángeles Gamaza"
+date: "`r format(Sys.Date(), '%d-%m-%Y')`"
+
+output:
+  bookdown::pdf_document2:
+    toc: false
+    toc_depth: 3
+    number_sections: true
+    keep_tex: false
+
+bibliography: report_biblio.bib
+csl: ices-journal-of-marine-science.csl
+link-citations: true
+
+header-includes:
+  - \usepackage{adjustbox}
+---
+
+
+**Working Document 06 — WKSPSIM 2026**
+
+**Stock:** Anchovy (*Engraulis encrasicolus*) in the southern part of Division 9.a  
+(Gulf of Cadiz and southern part of Portugal), ane.27.9aS
+
+**Affiliation:** Instituto Español de Oceanografía (IEO-CSIC), Centro Oceanográfico de Cádiz, Spain
+
+
+
+```{r setup, include=FALSE}
+library(knitr)
+library(here)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+rds_dir <- here("data","Rdata")
+out_dir <- here("outputs","MP")
+fig_dir <- file.path(out_dir,"figures")
+tab_dir <- file.path(out_dir,"tables")
+
+knitr::opts_chunk$set(
+  echo=FALSE,
+  message=FALSE,
+  warning=FALSE,
+  fig.align="center",
+  out.width="95%"
+)
+
+read_csv_if_exists <- function(path) {
+  if (!file.exists(path)) return(NULL)
+  read.csv(path,check.names=FALSE)
+}
+
+include_graphic_if_exists <- function(path) {
+  if (file.exists(path)) knitr::include_graphics(path)
+}
+```
+# Enfoque general
+
+El Management Procedure (MP) utilizado en el *shortcut* Management Strategy
+Evaluation (MSE) de *ane.27.9aS* transforma el estado percibido del stock en
+consejo anual de mortalidad por pesca y captura. La regla combina un límite
+de mortalidad por pesca, \(F_{cap}\), y un nivel de biomasa de escape,
+\(B_{esc}\) [@Punt2016; @ICES2020WKGMSE3].
+
+El MP utiliza el estado percibido del stock y no directamente el estado
+representado por el Operating Model (OM). El *assessment error*, parametrizado
+en el WD05, modifica las cantidades utilizadas por el MP. A partir de este
+estado se realiza una proyección de corto plazo y se aplica la regla
+\(F_{cap}\)--\(B_{esc}\) para obtener la mortalidad por pesca aconsejada
+(\(F_{adv}\)) y la captura aconsejada (TAC).
+
+La secuencia del ciclo de gestión es:
+
+\[
+\begin{aligned}
+\text{estado del OM}
+&\rightarrow \text{assessment error} \\
+&\rightarrow \text{estado percibido} \\
+&\rightarrow \text{proyección de corto plazo} \\
+&\rightarrow F_{cap}\text{--}B_{esc} \\
+&\rightarrow F_{adv},\ TAC \\
+&\rightarrow \text{OM}.
+\end{aligned}
+\]
+
+El *shortcut MSE* incorpora tres fuentes de variabilidad e incertidumbre. El
+**process error** introduce variabilidad futura en el OM mediante el
+reclutamiento. El **assessment error** modifica el estado del stock percibido
+por el MP. La **forecast uncertainty** se aplica a la proyección de corto
+plazo utilizada para generar el advice.
+
+El assessment de referencia corresponde a la configuración SS3 acordada en
+WKBANSP y documentada en el Stock Annex de *ane.27.9aS*
+[@ICES2024WKBANSP; @ICES2025StockAnnex9aS]. La construcción y validación del
+OM se documentan en los WDs01--04 y el *assessment error* en el WD05.
+
+Este WD06 documenta la formulación e implementación de la regla
+\(F_{cap}\)--\(B_{esc}\), la incorporación del *assessment error* y de la
+*forecast uncertainty*, y la validación de la generación de \(F_{adv}\) y
+TAC. También define el grid inicial de 20 candidate MPs. El WD07 evalúa y
+refina estas alternativas y el WD08 examina su robustez.
+# Métodos
+
+## Observación y construcción del stock percibido
+
+La conexión entre el OM y el MP se implementó mediante una versión modificada
+de `perfectObs4seas()` dentro de la arquitectura de simulación de FLBEIA
+[@Garcia2017FLBEIA]. La función se adaptó para conservar las cuatro estaciones
+del OM y las iteraciones de simulación en el objeto `FLStock` utilizado por
+el MP.
+
+Las cantidades biológicas (`stock.n`, `stock.wt`, `m`, madurez y *spawning
+timing*) se obtienen del `FLBiol`, mientras que las cantidades pesqueras se
+reconstruyen a partir de los objetos `FLFleet`. Para el período histórico, la
+mortalidad por pesca se obtiene del stock condicionado cuando está disponible.
+Durante la proyección, la mortalidad por pesca realizada se reconstruye a
+partir de la abundancia, la mortalidad natural y la captura mediante la
+ecuación de Baranov.
+
+No se incorpora *observation error*. El `FLStock` generado por
+`perfectObs4seas()` representa el estado del OM disponible para el ciclo de
+gestión y mantiene la estructura trimestral requerida por el MP.
+
+El *assessment error* se aplica posteriormente dentro de
+`FcapBpaHCR_ane()` para construir el estado percibido utilizado por el MP,
+sin modificar el estado del OM. En la configuración de referencia, los
+multiplicadores de SSB y \(F\) se aplican al *assessment year*. El error de
+evaluación del reclutamiento (`assess_error_R`) permanece desactivado.
+
+## Secuencia anual del Management Procedure
+
+`FcapBpaHCR_ane()` es la función desarrollada para implementar el Management
+Procedure \(F_{cap}\)--\(B_{esc}\) de *ane.27.9aS*. La función recibe el
+`FLStock` generado por `perfectObs4seas()`, construye el estado percibido,
+realiza la proyección de corto plazo y aplica la regla de gestión para generar
+el advice del año siguiente.
+
+En cada ciclo anual se realizan los siguientes pasos:
+
+1. identificar el *assessment year* y el *TAC year*;
+2. aplicar el *assessment error* para construir el estado percibido;
+3. estimar la distribución estacional reciente de \(F\);
+4. obtener el patrón relativo de \(F\)-at-age por trimestre;
+5. proyectar la abundancia desde Q4 del *assessment year* hasta Q1 del
+   *TAC year*;
+6. extender al *TAC year* las cantidades biológicas requeridas por la
+   proyección;
+7. realizar la proyección estacional para cada valor candidato de \(F\);
+8. aplicar la regla \(F_{cap}\)--\(B_{esc}\);
+9. calcular la captura anual correspondiente al \(F\) seleccionado mediante
+   la ecuación de Baranov;
+10. almacenar el valor seleccionado como \(F_{adv}\) y la captura resultante
+    como TAC.
+
+```{r mp-conceptual-framework, echo=FALSE, out.width="82%", fig.align="center", fig.cap="Secuencia anual del Management Procedure implementado para ane.27.9aS, desde el estado del Operating Model hasta la generación de Fadv y TAC."}
+knitr::include_graphics(
+  here::here(
+    "outputs",
+    "MP",
+    "figures",
+    "HCR_Fcap_Besc_ESQUEMA.png"
+  )
+)
+```
+
+## Representación de la mortalidad por pesca
+
+La mortalidad por pesca utilizada en la proyección se representa como
+
+\[
+F_{a,s}=F_{base}\,p_s\,r_{a,s},
+\]
+
+donde \(F_{base}\) es la mortalidad por pesca anual evaluada por la HCR,
+\(p_s\) es la proporción asignada a la estación \(s\) y \(r_{a,s}\) es el
+patrón relativo de \(F\)-at-age dentro de esa estación.
+
+### Distribución estacional de F: `get_Fprop()`
+
+La función `get_Fprop()` estima \(p_s\) a partir del stock percibido. Para
+cada uno de los últimos `nFyears`, se obtiene \(F\)-at-age por estación. La
+intensidad de cada estación se representa mediante su máximo \(F\)-at-age y
+se expresa como proporción del total anual. Las proporciones se promedian
+entre años y se normalizan de forma que
+
+\[
+\sum_s p_s=1.
+\]
+
+La configuración de referencia utiliza los cinco años más recientes
+(`nFyears = 5`). Estas proporciones se utilizan en la proyección del MP y son
+independientes de las proporciones estacionales de captura utilizadas por el
+OM. En REF, el OM utiliza las medias específicas por OM estimadas para
+2015--2024. Los escenarios S-C1 y S-C2 modifican estas proporciones en el OM,
+sin imponerlas a `get_Fprop()` (WD08).
+
+### Patrón relativo de F-at-age: `get_Frel()`
+
+La función `get_Frel()` obtiene el patrón relativo por edad a partir de
+`catch.q`. La capturabilidad se normaliza dentro de cada estación:
+
+\[
+r_{a,s}=
+\frac{q_{a,s}}
+     {\max_a(q_{a,s})},
+\]
+
+de forma que
+
+\[
+\max_a(r_{a,s})=1.
+\]
+
+La normalización conserva el patrón relativo por edad dentro de cada estación.
+
+## Proyección al inicio del TAC year: `get_N_next_Q1()`
+
+El MP utiliza la información disponible hasta el *assessment year* \(y\) para
+generar el advice correspondiente al *TAC year* \(y+1\).
+`get_N_next_Q1()` parte de la abundancia percibida en Q4 del *assessment
+year* y aplica la supervivencia correspondiente a Q4:
+
+\[
+N^{endQ4}_{a}
+=
+N^{Q4}_{a}
+\exp[-(M_{a,Q4}+F_{a,Q4})].
+\]
+
+A continuación se realiza el envejecimiento:
+
+\[
+N^{y+1}_{1,Q1}=N^{endQ4}_{0},
+\]
+
+\[
+N^{y+1}_{2,Q1}=N^{endQ4}_{1},
+\]
+
+\[
+N^{y+1}_{3+,Q1}
+=
+N^{endQ4}_{2}+N^{endQ4}_{3+}.
+\]
+
+La abundancia de edad 0 se fija en cero en Q1. El reclutamiento de edad 0 se
+incorpora al inicio de Q3, de acuerdo con la configuración temporal del
+assessment SS3.
+
+## Extensión de cantidades biológicas al TAC year
+
+`FLasher::stf()` se utiliza para extender al *TAC year* las cantidades
+biológicas requeridas por la proyección: mortalidad natural, pesos de captura
+y peso reproductivo.
+
+`stf()` no ejecuta la dinámica poblacional utilizada por la HCR. La
+proyección de corto plazo se implementa mediante
+`project_ss3_one_year()` y no utiliza `FLasher::fwd()`.
+
+## Proyección estacional SS3-like: `project_ss3_one_year()`
+
+La función `project_ss3_one_year()` reproduce la estructura temporal utilizada
+en el primer año de forecast del assessment SS3: cuatro estaciones, SSB al
+inicio de Q2, reclutamiento de edad 0 al inicio de Q3 y grupo plus 3+
+[@Methot2013; @Methot2024; @ICES2024WKBANSP].
+
+Para cada edad \(a\) y estación \(s\),
+
+\[
+F_{a,s}=F_{base}p_sr_{a,s},
+\]
+
+y
+
+\[
+Z_{a,s}=M_{a,s}+F_{a,s}.
+\]
+
+La mortalidad natural se proporciona en escala estacional
+(`M_is_seasonal = TRUE`), por lo que no se aplica un factor temporal
+adicional.
+
+La captura en número se calcula mediante la ecuación de Baranov:
+
+\[
+C_{a,s}
+=
+N_{a,s}
+\frac{F_{a,s}}{Z_{a,s}}
+\left[1-\exp(-Z_{a,s})\right].
+\]
+
+La captura en biomasa por estación es
+
+\[
+C_s
+=
+\sum_a C_{a,s}W^{catch}_{a,s},
+\]
+
+y la captura anual es
+
+\[
+C_{annual}=\sum_s C_s.
+\]
+
+Después de aplicar la mortalidad de Q1, la SSB se calcula al inicio de Q2:
+
+\[
+SSB_{Q2}
+=
+\sum_a N_{a,Q2}W^{spawn}_{a}.
+\]
+
+El reclutamiento se incorpora al inicio de Q3 mediante la relación de
+Beverton--Holt:
+
+\[
+R_{Q3}
+=
+\frac{a\,SSB_{Q2}}
+     {b+SSB_{Q2}}.
+\]
+
+Los parámetros \(a\) y \(b\) son específicos de cada OM y se obtienen
+mediante `get_SRpars()` para la iteración correspondiente.
+
+Después de Q4 se aplica la supervivencia y el envejecimiento para obtener la
+abundancia al inicio de Q1 del año siguiente.
+
+## Regla determinista \(F_{cap}\)--\(B_{esc}\)
+
+La función `get_F_HCR()` selecciona la mayor mortalidad por pesca que satisface
+el criterio de escapement dentro del intervalo
+
+\[
+0\leq F\leq F_{cap}.
+\]
+
+En la formulación determinista, un valor candidato de \(F\) es aceptable
+cuando
+
+\[
+SSB_{forecast}(F)\geq B_{esc}.
+\]
+
+La regla presenta tres casos.
+
+**Fcap.** Si
+
+\[
+SSB_{forecast}(F_{cap})\geq B_{esc},
+\]
+
+se selecciona
+
+\[
+F^*=F_{cap}.
+\]
+
+**Closure.** Si
+
+\[
+SSB_{forecast}(0)<B_{esc},
+\]
+
+se selecciona
+
+\[
+F^*=0.
+\]
+
+**Reduced F.** Si \(F=0\) satisface el criterio y \(F_{cap}\) no lo satisface,
+`uniroot()` obtiene el valor \(F^*\) que cumple
+
+\[
+SSB_{forecast}(F^*)=B_{esc}.
+\]
+
+## Forecast uncertainty
+
+La *forecast uncertainty* representa la incertidumbre de la SSB proyectada
+utilizada por la HCR para generar el advice. Su parametrización se obtuvo a
+partir de la incertidumbre del primer año de forecast de SSB de SS3.
+
+Se consideraron tres configuraciones:
+
+- **S0:** forecast determinista, \(CV=0\);
+- **S1:** CV de la SSB del primer año de forecast de la evaluación base de
+  2024;
+- **S2:** distribución empírica de los CVs de la SSB del primer año de
+  forecast obtenida de 100 assessments bootstrap.
+
+S0 y S1 se utilizaron para el desarrollo y validación de la HCR. S2 se
+utilizó en el MSE de referencia. En las simulaciones completas, un CV de la
+distribución empírica S2 se asigna externamente a cada trayectoria y se
+mantiene asociado a ella durante la proyección. La HCR no realiza muestreo
+aleatorio del CV.
+
+## Distribución probabilística de la SSB proyectada
+
+Para cada valor candidato de \(F\), `project_ss3_one_year()` proporciona
+
+\[
+\mu_F=SSB_{forecast}(F).
+\]
+
+La desviación estándar se define como
+
+\[
+\sigma_F=CV_{SSB}\mu_F,
+\]
+
+y la incertidumbre del forecast se representa mediante
+
+\[
+SSB_{forecast}(F)
+\sim
+N(\mu_F,\sigma_F^2).
+\]
+
+## Regla probabilística de escapement
+
+La regla probabilística requiere
+
+\[
+P[SSB_{forecast}(F)<B_{esc}]\leq\alpha,
+\]
+
+con
+
+\[
+\alpha=0.05.
+\]
+
+Bajo la distribución especificada, este criterio equivale a
+
+\[
+Q_{0.05}(F)\geq B_{esc},
+\]
+
+donde
+
+\[
+Q_{0.05}(F)
+=
+\mu_F+z_{0.05}\sigma_F.
+\]
+
+`get_F_HCR()` calcula \(Q_{0.05}(F)\) y
+\(P(SSB_{forecast}<B_{esc})\) para cada valor de \(F\).
+
+La regla mantiene los tres casos definidos para la formulación determinista:
+
+\[
+Q_{0.05}(F_{cap})\geq B_{esc}
+\quad\Rightarrow\quad
+F^*=F_{cap},
+\]
+
+\[
+Q_{0.05}(0)<B_{esc}
+\quad\Rightarrow\quad
+F^*=0,
+\]
+
+y, en el caso intermedio,
+
+\[
+Q_{0.05}(F^*)=B_{esc}.
+\]
+
+Cuando \(CV=0\),
+
+\[
+Q_{0.05}(F)=\mu_F,
+\]
+
+por lo que la regla coincide con la formulación determinista.
+
+## Generación de \(F_{adv}\) y TAC
+
+Una vez seleccionado \(F^*\), la misma proyección proporciona la captura anual
+correspondiente. El MP define
+
+\[
+F_{adv}=F^*
+\]
+
+y
+
+\[
+TAC=C_{annual}(F^*).
+\]
+
+La secuencia de generación del advice es
+
+\[
+\begin{aligned}
+\text{estado percibido}_y
+&\rightarrow N_{Q1,y+1} \\
+&\rightarrow SSB_{Q2,y+1}(F) \\
+&\rightarrow F_{cap}\text{--}B_{esc} \\
+&\rightarrow F_{adv,y+1} \\
+&\rightarrow TAC_{y+1}.
+\end{aligned}
+\]
+
+```{r}
+mp_functions <- data.frame(
+  Función = c(
+    "perfectObs4seas() [modificada]",
+    "FcapBpaHCR_ane()",
+    "get_Fprop()",
+    "get_Frel()",
+    "get_N_next_Q1()",
+    "get_SRpars()",
+    "project_ss3_one_year()",
+    "get_F_HCR()"
+  ),
+  Descripción = c(
+    "Construcción del FLStock observado conservando las cuatro estaciones del OM.",
+    "Integración del ciclo anual del MP y generación de Fadv y TAC.",
+    "Estimación de la distribución estacional de F utilizada en el forecast.",
+    "Obtención del patrón relativo de F-at-age a partir de catch.q.",
+    "Proyección de la abundancia desde Q4 del assessment year hasta Q1 del TAC year.",
+    "Extracción de los parámetros Beverton--Holt específicos de cada OM.",
+    "Proyección estacional de un año utilizada por la HCR.",
+    "Evaluación de la regla Fcap--Besc y selección de Fadv."
+  )
+)
+```
+
+
+
+
+
+
+
+## Estrategia de validación
+
+La implementación se validó secuencialmente en tres niveles, evitando utilizar directamente el MSE completo como única prueba del MP.
+
+### Validación matemática y del motor de proyección
+
+`16_VALIDATE_PROBABILISTIC_HCR.R` valida la formulación probabilística antes de su integración operacional. El script comprueba:
+
+- equivalencia entre el criterio expresado como probabilidad y como cuantil inferior;
+- relación entre forecast CV y SSB media requerida para satisfacer el criterio;
+- respuesta monotónica de SSB y captura frente a F en el rango relevante;
+- reproducción de un benchmark independiente del primer año de forecast de SS3;
+- comportamiento de la HCR bajo S0, S1 y S2;
+- equivalencia determinista cuando $CV=0$;
+- funcionamiento de las ramas `Fcap`, `reduced` y `closure`.
+
+Para la validación frente a SS3 se utilizaron directamente abundancia, selectividad, pesos y configuración del primer año de forecast del assessment de referencia. La comparación de captura se consideró satisfactoria cuando la diferencia relativa fue inferior a 0.1%.
+
+### Unit test de la función HCR
+
+`17_TEST_PROBABILISTIC_HCR_FUNCTION.R` prueba `get_F_HCR()` fuera de FLBEIA utilizando una trayectoria condicionada del OM. Se evalúan cuatro configuraciones principales: HCR determinista, opción probabilística con $CV=0$, S1 y la mediana de S2. Adicionalmente se construye un caso de alta incertidumbre para comprobar explícitamente la rama de cierre.
+
+Este test permite verificar la función de decisión sin introducir efectos procedentes del resto del ciclo cerrado.
+
+### Validación operacional en FLBEIA
+
+`18_VALIDATE_OPERATIONAL_PROBABILISTIC_HCR.R` valida la implementación dentro de un ciclo cerrado FLBEIA de un único paso, 2024--2025. Todas las configuraciones utilizan la misma trayectoria condicionada, el mismo process error de reclutamiento, observación perfecta y assessment error desactivado. Se comparan:
+
+1. HCR determinista de referencia;
+2. implementación probabilística con la opción de probabilidad desactivada;
+3. implementación probabilística activada con $CV=0$;
+4. S1;
+5. mediana de S2.
+
+Las comparaciones 1--3 evalúan backward compatibility y el límite de incertidumbre nula. Las comparaciones S1--S2 evalúan si forecast uncertainty modifica el advice exclusivamente a través del criterio probabilístico de escapement.
+
+La SSB extraída después de cada ejecución FLBEIA corresponde a la SSB **realizada del OM**, y no a la SSB interna del forecast utilizada por la HCR para seleccionar F.
+
+# Resultados
+
+## Caracterización de forecast uncertainty
+
+La evaluación base de 2024 produjo un CV de la SSB del primer año de forecast de aproximadamente 0.240 (S1). En los 100 assessments bootstrap contemporáneos, la mediana del CV de forecast fue aproximadamente 0.296 (S2). La incertidumbre del reclutamiento terminal y la incertidumbre de la SSB del primer año de forecast presentaron una asociación positiva tanto entre las evaluaciones históricas como entre los 100 assessments bootstrap contemporáneos. El CV de la SSB del primer año de forecast se utilizó posteriormente como descriptor de forecast uncertainty en la HCR probabilística.
+
+S2 se retuvo como representación de referencia para el MSE. La mediana de S2 se utilizó únicamente como caso representativo en las pruebas funcionales y operacionales; la implementación final conserva la distribución empírica de CV entre trayectorias.
+
+```{r forecast-uncertainty-table, results='asis'}
+forecast_table_file <- file.path(tab_dir,"forecast_uncertainty_summary.csv")
+forecast_table <- read_csv_if_exists(forecast_table_file)
+
+if (!is.null(forecast_table)) {
+  print(kable(
+    forecast_table,
+    digits=4,
+    caption="Resumen de la incertidumbre del primer año de forecast utilizada para definir S0, S1 y S2.",
+    booktabs=TRUE
+  ))
+}
+```
+
+```{r forecast-uncertainty-figure, fig.cap="Distribución empírica del CV de la SSB del primer año de forecast obtenida de los 100 assessments bootstrap contemporáneos (S2). La línea discontinua indica el CV de la evaluación base de 2024 (S1) y la línea punteada la mediana de S2, utilizada únicamente como caso representativo en las pruebas de validación.", fig.width=7, fig.height=5}
+forecast_uncertainty_file <- file.path(rds_dir,"forecast_uncertainty_characterisation.rds")
+
+stopifnot(file.exists(forecast_uncertainty_file))
+
+forecast_uncertainty <- readRDS(forecast_uncertainty_file)
+
+forecast_cv <- forecast_uncertainty$contemporary$SSB_2025_CV
+CV_S1 <- as.numeric(forecast_uncertainty$base$SSB_CV)
+CV_S2_median <- median(forecast_cv)
+
+stopifnot(length(forecast_cv)==100)
+stopifnot(all(is.finite(forecast_cv)))
+
+fig_forecast_cv <- ggplot(data.frame(CV=forecast_cv),aes(x=CV)) +
+  geom_histogram(bins=20,fill="grey85",colour="black",linewidth=0.3) +
+  geom_vline(xintercept=CV_S1,linetype="dashed",linewidth=0.8) +
+  geom_vline(xintercept=CV_S2_median,linetype="dotted",linewidth=0.8) +
+  annotate("text",x=CV_S1,y=Inf,label=paste0("S1 = ",round(CV_S1,3)),angle=90,vjust=-0.5,hjust=1.1,size=3.5) +
+  annotate("text",x=CV_S2_median,y=Inf,label=paste0("S2 median = ",round(CV_S2_median,3)),angle=90,vjust=-0.5,hjust=1.1,size=3.5) +
+  labs(x="First-year forecast SSB CV",y="Number of bootstrap assessments") +
+  theme_bw(base_size=11) +
+  theme(panel.grid.minor=element_blank(),legend.position="none")
+
+fig_forecast_cv
+```
+
+## Validación de la proyección SS3-like
+
+La proyección independiente reprodujo la captura del primer año de forecast de SS3 con una diferencia inferior a la tolerancia predefinida de 0.1%. Para $F=1.112$, SS3 produjo una captura de 7,309 t y la proyección SS3-like produjo 7,305.37 t. La diferencia fue -3.63 t, equivalente a -0.050%.
+
+En el rango de \(F\) utilizado para la validación, la SSB proyectada disminuyó monotónicamente al aumentar \(F\), mientras que la captura aumentó monotónicamente.
+
+```{r ss3-projection-validation}
+ss3_projection_validation <- data.frame(
+  F=1.112,
+  `SS3 catch (t)`=7309,
+  `MP catch (t)`=7305.371,
+  `Difference (t)`=-3.629,
+  `Difference (%)`=-0.0497,
+  check.names=FALSE
+)
+
+kable(
+  ss3_projection_validation,
+  digits=c(3,0,3,3,4),
+  caption="Validación del motor de proyección SS3-like frente al primer año de forecast de SS3.",
+  booktabs=TRUE
+)
+```
+
+## Validación funcional de la regla probabilística
+
+La formulación probabilística reprodujo exactamente el cálculo de probabilidad obtenido directamente a partir de la media y desviación estándar del forecast SS3. Asimismo, la SSB media necesaria para satisfacer el criterio aumentó al aumentar el CV, como consecuencia directa de mantener constante el límite de riesgo $\alpha=0.05$.
+
+El unit test confirmó el límite determinista de la implementación: con $CV=0$, la opción probabilística produjo el mismo F, TAC, SSB proyectada y rama de decisión que la formulación determinista.
+
+El efecto del criterio probabilístico sobre la selección de F se ilustra utilizando la mediana de S2. Para cada valor candidato de F se representa la SSB media proyectada, $\mu_F$, y su cuantil inferior $Q_{0.05}(F)$. La intersección de $Q_{0.05}(F)$ con $B_{esc}$ determina el máximo F compatible con el criterio de riesgo para ese estado del stock y nivel de incertidumbre.
+
+```{r probabilistic-hcr-response-figure, fig.cap="Funcionamiento de la regla probabilística $F_{cap}$--$B_{esc}$ para la mediana de S2. La línea continua representa la SSB media proyectada ($\\mu_F$), la línea discontinua el cuantil inferior $Q_{0.05}(F)$ y la línea horizontal $B_{esc}$. La línea vertical identifica aproximadamente $F^*$, definido por $Q_{0.05}(F^*)=B_{esc}$.", fig.width=7, fig.height=5}
+F_response_file <- file.path(tab_dir,"Table16_Fcap_range_diagnostic.csv")
+
+stopifnot(file.exists(F_response_file))
+
+F_response_plot <- read.csv(F_response_file,check.names=FALSE)
+
+stopifnot(all(c("F","SSB") %in% names(F_response_plot)))
+
+F_response_plot <- F_response_plot %>%
+  filter(F<=1.5) %>%
+  arrange(F) %>%
+  mutate(Q05=SSB+qnorm(0.05)*CV_S2_median*SSB)
+
+Besc_plot <- 6561
+
+crossing <- which(diff(sign(F_response_plot$Q05-Besc_plot))!=0)
+
+stopifnot(length(crossing)>=1)
+
+i <- crossing[1]
+
+F_star_plot <- approx(
+  x=F_response_plot$Q05[c(i,i+1)],
+  y=F_response_plot$F[c(i,i+1)],
+  xout=Besc_plot
+)$y
+
+fig_hcr_response <- ggplot(F_response_plot,aes(x=F)) +
+  geom_line(aes(y=SSB,linetype="Mean forecast SSB"),linewidth=0.9) +
+  geom_line(aes(y=Q05,linetype="Lower 5% quantile"),linewidth=0.9) +
+  geom_hline(yintercept=Besc_plot,linetype="dotdash",linewidth=0.7) +
+  geom_vline(xintercept=F_star_plot,linetype="longdash",linewidth=0.7) +
+  annotate("text",x=F_star_plot,y=min(F_response_plot$Q05),label=expression(F^"*"),vjust=-0.6,hjust=-0.2,size=4) +
+  scale_linetype_manual(values=c("Mean forecast SSB"="solid","Lower 5% quantile"="dashed")) +
+  labs(x="Annual fishing mortality (F)",y="Forecast SSB (t)",linetype=NULL) +
+  theme_bw(base_size=11) +
+  theme(legend.position="top",panel.grid.minor=element_blank())
+
+fig_hcr_response
+```
+
+Para la trayectoria utilizada en el test, S1 mantuvo $F_{cap}=1.5$. Con la mediana de S2, la mayor incertidumbre desplazó el cuantil inferior de SSB hasta el límite de escapement y la HCR seleccionó un F intermedio. El caso construido por encima del umbral de incertidumbre para cierre produjo $F=0$. De esta forma se reprodujeron explícitamente las tres ramas `Fcap`, `reduced` y `closure`.
+
+```{r hcr-unit-test}
+hcr_unit_test <- data.frame(
+  Escenario=c("Deterministic","Probability CV=0","S1","S2 median","Closure test"),
+  CV=c(0,0,0.2395548,0.2961490,0.3281),
+  F=c(1.5,1.5,1.5,0.7262663,0),
+  `TAC (t)`=c(7787.771,7787.771,7787.771,4661.467,NA),
+  `Forecast SSB (t)`=c(11839.62,11839.62,11839.62,12792.51,NA),
+  `Q05 (t)`=c(11839.62,11839.62,7174.423,6560.998,6334.67),
+  `P(<Besc)`=c(0,0,0.03136261,0.05000005,0.0554),
+  Rama=c("Fcap","Fcap","Fcap","reduced","closure"),
+  check.names=FALSE
+)
+
+kable(
+  hcr_unit_test,
+  digits=4,
+  caption="Unit test de la regla Fcap--Besc determinista y probabilística. El caso de cierre se construyó específicamente para verificar esa rama del algoritmo.",
+  booktabs=TRUE
+)
+```
+
+## Validación operacional en FLBEIA
+
+La implementación probabilística con la opción de probabilidad desactivada reprodujo la HCR determinista de referencia. La equivalencia también se mantuvo cuando la opción probabilística estuvo activada con $CV=0$, confirmando backward compatibility y la equivalencia matemática entre ambas formulaciones en ausencia de forecast uncertainty.
+
+En la trayectoria operacional utilizada para la validación, S1 mantuvo $F_{adv}=1.5$. Con la mediana de S2, el criterio probabilístico requirió una reducción de F, resultando en $F_{adv}=1.3701$ y un TAC de aproximadamente 6,715 t. La reducción del advice produjo una captura realizada prácticamente idéntica al TAC y una SSB realizada ligeramente superior a la obtenida bajo la configuración de referencia.
+
+Estos resultados corresponden a una única trayectoria utilizada para validar la implementación y no representan el desempeño esperado de un candidate MP. El desempeño se evalúa posteriormente sobre el ensemble completo de 1,000 trayectorias.
+
+```{r operational-validation}
+operational_validation <- data.frame(
+  Escenario=c("Reference","Probability OFF","Probability CV=0","S1","S2 median"),
+  CV=c(NA,0,0,0.2395548,0.2961490),
+  Fadv=c(1.5,1.5,1.5,1.5,1.370105),
+  `TAC (t)`=c(7138.769,7138.769,7138.769,7138.769,6715.427),
+  `Realised SSB (t)`=c(12616.79,12616.79,12616.79,12616.79,12684.39),
+  `Realised catch (t)`=c(7138.817,7138.817,7138.817,7138.817,6715.455),
+  check.names=FALSE
+)
+
+kable(
+  operational_validation,
+  digits=3,
+  caption="Validación operacional de la HCR probabilística dentro de FLBEIA para una trayectoria condicionada y un único paso de gestión 2024--2025.",
+  booktabs=TRUE
+)
+```
+
+
+# Definición del espacio de candidate MPs
+
+Una vez validada la formulación probabilística y su implementación operacional, se definió el espacio de valores de $F_{cap}$ y $B_{esc}$ que sería evaluado posteriormente mediante el MSE *closed-loop*. La evaluación de procedimientos candidatos sobre un conjunto común de OMs es coherente con el uso del MSE para comparar consecuencias de estrategias alternativas bajo incertidumbre [@Punt2016; @ICES2020WKGMSE3]. Esta etapa tiene una función distinta de la evaluación de desempeño: los diagnósticos descritos a continuación delimitan un conjunto de alternativas plausibles, pero no seleccionan a priori una estrategia ni determinan qué combinaciones son precautorias.
+
+El espacio candidato se definió mediante dos diagnósticos complementarios. El primero caracteriza la respuesta del OM a un gradiente amplio de mortalidad por pesca y utiliza la explotación histórica reciente como contexto para delimitar $F_{cap}$. El segundo sitúa valores alternativos de $B_{esc}$ respecto de los puntos de referencia del stock y cuantifica las implicaciones de la regla probabilística bajo los escenarios de forecast uncertainty descritos anteriormente.
+
+## Diagnóstico y delimitación del rango de $F_{cap}$
+
+El diagnóstico de explotación se realizó con `18a_FCAP_SEASONAL_EXPLOITATION_DIAGNOSTIC_CORRECTED.R`. Se utilizaron los 100 OMs condicionados y una trayectoria representativa por OM (`replicate == 1`) para evitar interpretar los diez replicados de process error como condiciones históricas independientes. Para cada OM se proyectó 2025 sobre un gradiente
+
+$$
+F\in[0,5],
+$$
+
+con incrementos de $\Delta F=0.05$. Los valores altos del gradiente, particularmente $F=4$ y $F=5$, se utilizaron únicamente para caracterizar la forma completa de la respuesta del sistema y no como valores candidatos de $F_{cap}$.
+
+La proyección mantuvo la estructura utilizada por el MP: cuatro estaciones, SSB al inicio de Q2, reclutamiento al inicio de Q3, parámetros Beverton--Holt específicos de cada OM, ecuación de captura de Baranov y patrón relativo de F-at-age derivado de `catch.q`. Para cada OM, la intensidad global de explotación se distribuyó entre estaciones utilizando su patrón condicionado de explotación. Por tanto, el experimento modifica la intensidad global de F conservando la estructura estacional y por edad representada en cada OM.
+
+Se examinaron conjuntamente la captura anual, el rendimiento marginal de captura, la SSB, la biomasa vulnerable disponible en los trimestres posteriores y la mortalidad por pesca realizada históricamente. El rendimiento marginal se definió como
+
+$$
+MC_i=
+\frac{C(F_i)-C(F_{i-1})}
+{F_i-F_{i-1}},
+$$
+
+y se utilizó como diagnóstico de la ganancia adicional de captura obtenida al incrementar F. No se interpretó como una estimación de $F_{MSY}$ ni se aplicó un umbral de rendimiento marginal para seleccionar automáticamente $F_{cap}$.
+
+```{r fcap-diagnostic-load, include=FALSE}
+fcap_dir <- here("outputs","mse","Fcap_seasonal_exploitation")
+fcap_fig_dir <- file.path(fcap_dir,"figures")
+fcap_file <- file.path(fcap_dir,"FCAP_seasonal_exploitation_diagnostic.rds")
+
+stopifnot(file.exists(fcap_file))
+
+fcap_diag <- readRDS(fcap_file)
+
+fcap_transition <- fcap_diag$transition_table
+fcap_hist_recent <- fcap_diag$historical_F_recent_summary
+```
+
+### Respuesta del OM al incremento de F
+
+La captura anual aumentó monotónicamente dentro del rango explorado, pero con rendimientos marginales progresivamente decrecientes. Al mismo tiempo, la explotación acumulada redujo la biomasa vulnerable disponible durante Q3 y Q4. La Tabla \@ref(tab:fcap-transition) resume esta transición para valores seleccionados del gradiente.
+
+```{r fcap-transition, results='asis'}
+fcap_transition_table <- fcap_transition %>%
+  dplyr::filter(F %in% c(1,1.25,1.5,1.75,2,2.5,3)) %>%
+  dplyr::transmute(
+    F=F,
+    `Catch (t)`=Catch_median,
+    `Marginal catch`=marginal_Catch_median,
+    `Relative marginal`=marginal_relative,
+    `VB Q3 / F=0`=VB_start_relative_median_Q3,
+    `VB Q4 / F=0`=VB_start_relative_median_Q4
+  )
+
+kable(
+  fcap_transition_table,
+  digits=c(2,0,0,3,3,3),
+  caption="Respuesta de la captura y de la biomasa vulnerable para valores seleccionados del gradiente experimental de F. Catch y marginal catch se expresan en toneladas; VB Q3/F=0 y VB Q4/F=0 son proporciones respecto de la biomasa vulnerable bajo F=0.",
+  booktabs=TRUE
+)
+```
+
+En la región finalmente retenida como candidata, la captura mediana aumentó aproximadamente desde 4,758 t para $F=1$ hasta 7,632 t para $F=2$, mientras el rendimiento marginal relativo disminuyó aproximadamente de 0.62 a 0.38. En paralelo, la biomasa vulnerable mediana disponible al inicio de Q3 disminuyó aproximadamente de 0.79 a 0.62 respecto de la trayectoria sin pesca y, en Q4, de 0.69 a 0.51. Estos patrones muestran una transición gradual y no un breakpoint único que permita seleccionar un valor concreto de $F_{cap}$ antes del MSE.
+
+```{r fcap-marginal-figure, fig.cap="Rendimiento marginal de captura frente al incremento experimental de F. El diagnóstico caracteriza la respuesta del OM y no define por sí mismo un valor óptimo de Fcap.", out.width="72%"}
+fcap_marginal_fig <- file.path(fcap_fig_dir,"FCAP_marginal_catch_response.png")
+stopifnot(file.exists(fcap_marginal_fig))
+knitr::include_graphics(fcap_marginal_fig)
+```
+
+### Contexto histórico de la mortalidad por pesca
+
+Como referencia adicional se examinó la mortalidad por pesca realizada de edad 3, consistente con la métrica de F utilizada para este stock. Para cada OM se calculó la media anual entre estaciones y posteriormente la media del período 2020--2024.
+
+La distribución entre los 100 OMs presentó una mediana de $F_{20-24}=1.66$, con percentiles 5 y 95 de aproximadamente 1.06 y 2.36, respectivamente, y un rango total aproximado de 0.82--2.95. Esta información se utilizó únicamente para contextualizar la escala de explotación: $F_{cap}$ es un parámetro de control del MP y no es equivalente a la mortalidad por pesca realizada en el OM.
+
+La evidencia histórica y el diagnóstico de explotación se consideraron conjuntamente. No se utilizó un umbral único de captura marginal, depleción o F histórica. Se retuvo un conjunto suficientemente amplio para que el MSE pudiera evaluar posteriormente los *trade-offs* entre riesgo biológico, rendimiento, estabilidad y cierres:
+
+$$
+\boxed{
+F_{cap}=
+\{1.00,\;1.25,\;1.50,\;1.75,\;2.00\}.
+}
+$$
+
+## Diagnóstico y delimitación del rango de $B_{esc}$
+
+El rango candidato de $B_{esc}$ se caracterizó mediante `18b_FCAP_BESC_CANDIDATE_RANGE_DIAGNOSTIC.R`. Este análisis no ejecuta FLBEIA ni selecciona un $B_{esc}$ óptimo. Su objetivo es situar los candidatos en una escala biológica interpretable y cuantificar cómo forecast uncertainty modifica la SSB esperada necesaria para satisfacer el criterio probabilístico de escapement.
+
+Para el MSE se mantienen operacionalmente
+
+$$
+B_{lim}=4721\ {\rm t},
+\qquad
+B_{pa}=6561\ {\rm t}.
+$$
+
+Como contexto adicional se consideraron los valores de biomasa examinados durante WKBANSP 2024, incluyendo $B_0$, $B_{loss}$ y formulaciones alternativas de $B_{lim}$ [@ICES2024WKBANSP]. Estos valores se utilizan para contextualizar el rango y no para redefinir los puntos de referencia adoptados en el MSE.
+
+Se consideraron cuatro niveles de escapement:
+
+$$
+B_{esc}\in\{5000,\;6561,\;8000,\;10000\}\ {\rm t}.
+$$
+
+El valor de 5,000 t representa el extremo inferior, próximo a $B_{lim}$ y por debajo de $B_{pa}$; 6,561 t coincide con el $B_{pa}$ operacional; y 8,000 y 10,000 t permiten explorar niveles progresivamente superiores a $B_{pa}$. Las reglas basadas en escapement tienen antecedentes en evaluaciones de harvest rules para stocks pelágicos de vida corta; esta referencia se utiliza únicamente como contexto metodológico y no como fundamento de los valores específicos adoptados aquí [@Trochta2024].
+
+```{r besc-diagnostic-load, include=FALSE}
+besc_dir <- here("outputs","mse","Besc_candidate_range")
+besc_fig_dir <- file.path(besc_dir,"figures")
+besc_file <- file.path(besc_dir,"BESC_candidate_range_diagnostic.rds")
+
+stopifnot(file.exists(besc_file))
+
+besc_diag <- readRDS(besc_file)
+
+besc_context <- besc_diag$Besc_context
+besc_candidate <- besc_diag$candidate_diagnostic
+```
+
+```{r besc-context-table, results='asis'}
+besc_context_table <- besc_context %>%
+  dplyr::transmute(
+    `Besc (t)`=Besc,
+    `/ Blim`=round(Besc_over_Blim,2),
+    `/ Bpa`=round(Besc_over_Bpa,2),
+    `/ B0`=round(Besc_over_B0,2),
+    `/ Bloss`=round(Besc_over_Bloss,2)
+  )
+
+kable(
+  besc_context_table,
+  caption="Escala biológica de los valores candidatos de Besc respecto de los puntos de referencia utilizados como contexto.",
+  booktabs=TRUE
+)
+```
+
+### Implicaciones de forecast uncertainty
+
+La regla probabilística requiere
+
+$$
+P(SSB_{forecast}<B_{esc})\leq0.05,
+$$
+
+equivalentemente,
+
+$$
+Q_{0.05}(SSB_{forecast})\geq B_{esc}.
+$$
+
+Bajo la aproximación
+
+$$
+SSB_{forecast}\sim N\left(\mu,(CV\mu)^2\right),
+$$
+
+la SSB media mínima necesaria para satisfacer el criterio es
+
+$$
+\mu_{required}=
+\frac{B_{esc}}
+{1+z_{0.05}CV},
+$$
+
+siempre que el denominador sea positivo. Por tanto, forecast uncertainty no modifica nominalmente $B_{esc}$, sino que incrementa la SSB esperada requerida para mantener la misma probabilidad de escapement.
+
+El diagnóstico utilizó las tres configuraciones previamente caracterizadas: S0 ($CV=0$), S1 (CV del primer año de forecast de la evaluación base de 2024) y S2 (distribución empírica de CV de los 100 assessments bootstrap contemporáneos). S0 y S1 se mantienen como referencias de interpretación; S2 es la representación adoptada posteriormente en el MSE.
+
+Para $B_{esc}=6561$ t, la SSB requerida es 6,561 t en S0, aproximadamente 10.8 kt bajo S1 y presenta una mediana de aproximadamente 12.8 kt bajo S2, con un intervalo P05--P95 aproximado de 10.9--17.6 kt. El aumento es proporcional a $B_{esc}$ para un CV fijo y muestra que los valores superiores de escapement implican condiciones progresivamente más restrictivas bajo la regla probabilística.
+
+```{r besc-required-figure, fig.cap="SSB esperada necesaria para satisfacer el criterio probabilístico de escapement a lo largo del rango diagnóstico de Besc. La banda correspondiente a S2 representa los percentiles 5--95 derivados de la distribución empírica de forecast CV.", out.width="78%"}
+besc_required_fig <- file.path(besc_fig_dir,"BESC_required_SSB_by_uncertainty.png")
+stopifnot(file.exists(besc_required_fig))
+knitr::include_graphics(besc_required_fig)
+```
+
+Estos resultados no se utilizaron para excluir a priori valores altos o bajos de $B_{esc}$. Determinar si un valor genera un nivel aceptable de riesgo, captura, variabilidad interanual o probabilidad de cierre requiere la simulación *closed-loop*.
+
+## Grid factorial de candidate MPs
+
+La combinación de ambos diagnósticos definió el espacio de gestión que se transfiere al MSE:
+
+$$
+F_{cap}=
+\{1.00,\;1.25,\;1.50,\;1.75,\;2.00\},
+$$
+
+$$
+B_{esc}=
+\{5000,\;6561,\;8000,\;10000\}\ {\rm t}.
+$$
+
+El diseño factorial contiene, por tanto,
+
+$$
+5\times4=20
+$$
+
+candidate MPs. Cada combinación representa una alternativa de gestión que debe ser evaluada sobre el mismo ensemble de OMs y fuentes de incertidumbre. Los diagnósticos anteriores delimitan el espacio candidato, pero **no constituyen una evaluación de performance ni una selección previa de MP**.
+
+
+# Integración en el shortcut MSE
+
+Una vez validados los componentes anteriores, la HCR probabilística se integra en el shortcut MSE mediante el mismo `annualTAC()` para todas las trayectorias. Cada trayectoria conserva su OM condicionado, su process error de reclutamiento, su assessment-error trajectory y su forecast CV asignado. La función HCR recibe estos inputs y genera anualmente `Fadv` y TAC sin reestimar un assessment completo dentro del ciclo cerrado.
+
+La distribución empírica S2 de forecast CV forma parte de la configuración de referencia de los candidate MPs. Por tanto, las diferencias posteriores entre candidate MPs se deben a sus parámetros de gestión, principalmente $F_{cap}$ y $B_{esc}$, manteniendo emparejadas las fuentes de incertidumbre entre escenarios.
+
+La evaluación del desempeño de los candidate MPs se documenta en el WD siguiente y no forma parte de la validación presentada aquí.
+
+# Trazabilidad y reproducibilidad
+
+La implementación documentada en este WD se basa en los siguientes componentes principales:
+
+- `perfectObs4seas.R`: construcción del stock observado preservando la estructura estacional;
+- `FcapBpaHCR_ane9aS_PROBABILITY_OPTION.R`: implementación operacional del MP y de la HCR probabilística;
+- `15_SS3_FORECAST_UNCERTAINTY.R`: caracterización de forecast uncertainty;
+- `16_VALIDATE_PROBABILISTIC_HCR.R`: validación matemática, SS3-like y respuesta de la HCR;
+- `17_TEST_PROBABILISTIC_HCR_FUNCTION.R`: unit test de `get_F_HCR()` fuera de FLBEIA;
+- `18_VALIDATE_OPERATIONAL_PROBABILISTIC_HCR.R`: validación operacional dentro del ciclo cerrado FLBEIA;
+- `18a_FCAP_SEASONAL_EXPLOITATION_DIAGNOSTIC_CORRECTED.R`: diagnóstico utilizado para delimitar el rango candidato de $F_{cap}$;
+- `18b_FCAP_BESC_CANDIDATE_RANGE_DIAGNOSTIC.R`: diagnóstico utilizado para delimitar el rango candidato de $B_{esc}$;
+- `19_MSE_SCENARIOS.R`: definición del grid factorial de 20 candidate MPs y del diseño experimental del MSE.
+
+Los principales objetos externos utilizados por la implementación incluyen el OM condicionado, los parámetros stock--recruit específicos de cada OM, los objetos de flota y `catch.q`, las trayectorias de assessment error y el objeto de caracterización de forecast uncertainty. Los scripts de validación utilizan estos mismos objetos sin recondicionar el OM.
+
+La lógica científica del MP se concentra en `project_ss3_one_year()` y `get_F_HCR()`. Las funciones restantes preparan los inputs necesarios o integran estas operaciones dentro de la arquitectura FLBEIA.
+
+# Conclusiones
+
+- El MP transforma el stock percibido en `Fadv` y TAC mediante una proyección estacional coherente con el timing del assessment SS3 de ane.27.9aS.
+- La regla $F_{cap}$--$B_{esc}$ limita F al intervalo $[0,F_{cap}]$ y contempla explícitamente las ramas `Fcap`, `reduced` y `closure`.
+- Forecast uncertainty se incorpora mediante un criterio probabilístico de escapement separado del process error y del assessment error.
+- La formulación probabilística converge exactamente a la formulación determinista cuando $CV=0$.
+- El motor de proyección reproduce el benchmark de captura del primer año de forecast de SS3 dentro de la tolerancia predefinida.
+- Los unit tests reprodujeron las tres ramas de decisión —Fcap, reduced y closure— y la validación operacional reprodujo la formulación determinista cuando la opción probabilística estuvo desactivada o \(CV=0\).
+- La distribución contemporánea S2 de forecast CV se retiene para la aplicación del MP en el ensemble completo del MSE; su mediana se utiliza únicamente como caso representativo durante la validación.
+- Los diagnósticos previos al MSE delimitan $F_{cap}=\{1.00,1.25,1.50,1.75,2.00\}$ y $B_{esc}=\{5000,6561,8000,10000\}$ t como rangos candidatos, sin seleccionar a priori una estrategia.
+- La combinación factorial de ambos parámetros define 20 candidate MPs.
+- La evaluación del desempeño de estas 20 combinaciones se realiza posteriormente sobre las 1,000 trayectorias emparejadas del MSE.
+
+La salida de **WD06** es un MP implementado y comprobado, junto con un grid inicial de 20 combinaciones. El **WD07** ejecuta la comparación sobre 1,000 trayectorias emparejadas por MP, documenta el refinamiento a 28 alternativas y la selección de doce para robustez. El umbral de escapement del forecast, el riesgo realizado de SSB y las consecuencias pesqueras se evalúan allí como cantidades distintas.
+
+# Referencias
+

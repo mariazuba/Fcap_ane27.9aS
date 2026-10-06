@@ -1,0 +1,574 @@
+---
+title: "Condicionamiento stock–reclutamiento y error de proceso del reclutamiento: ane.27.9aS"
+
+author:
+  - "María José Zúñiga"
+  - "Fernando Ramos"
+  - "María Ángeles Gamaza"
+
+date: "`r format(Sys.Date(), '%d-%m-%Y')`"
+
+output:
+  bookdown::pdf_document2:
+    toc: false
+    toc_depth: 3
+    number_sections: true
+    keep_tex: false
+
+bibliography: report_biblio.bib
+csl: ices-journal-of-marine-science.csl
+link-citations: true
+---
+
+
+
+**Working Document 02 — WKSPSIM 2026**
+
+**Stock:** Anchovy (*Engraulis encrasicolus*) in the southern part of Division 9.a  
+(Gulf of Cadiz and southern part of Portugal), ane.27.9aS
+
+**Affiliation:** Instituto Español de Oceanografía (IEO-CSIC), Centro Oceanográfico de Cádiz, Spain
+
+```{r setup, include=FALSE}
+library(knitr)
+library(here)
+library(kableExtra)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+rds_dir <- here("data","Rdata")
+fig_dir <- here("outputs","recruitment","figures")
+tab_dir <- here("outputs","recruitment","tables")
+diag_fig_dir <- here("outputs","recruitment_conditioning","figures")
+diag_tab_dir <- here("outputs","recruitment_conditioning","tables")
+required_csv <- function(path) { if(!file.exists(path)) stop("Missing WD input: ",path); read.csv(path,check.names=FALSE) }
+bh <- required_csv(file.path(rds_dir,"bh_summary_positive.csv"))
+free <- required_csv(file.path(rds_dir,"bh_free_vs_positive.csv"))
+map100 <- required_csv(file.path(rds_dir,"SR_reference_iteration_map.csv"))
+map1000 <- required_csv(file.path(rds_dir,"iteration_map_1000.csv"))
+sig <- required_csv(file.path(tab_dir,"sigmaR_historical_summary.csv"))
+sc <- required_csv(file.path(tab_dir,"recruitment_process_error_scenarios_summary.csv"))
+check <- required_csv(file.path(tab_dir,"sigmaR_om_specific_assignment_check.csv"))
+sr_models <- required_csv(file.path(diag_tab_dir,"WD_01_SR_model_comparison.csv"))
+sr_resid <- required_csv(file.path(diag_tab_dir,"WD_02_recruitment_residual_summary.csv"))
+sr_temporal <- required_csv(file.path(diag_tab_dir,"WD_03_temporal_dependence_summary.csv"))
+sr_boot <- required_csv(file.path(diag_tab_dir,"WD_04_BH_parameter_bootstrap_summary.csv"))
+sr_decisions <- required_csv(file.path(diag_tab_dir,"WD_05_conditioning_decisions.csv"))
+stopifnot(nrow(bh)==100,nrow(map100)==100,nrow(map1000)==1000,nrow(check)==1000)
+stopifnot(all(bh$convergence==0),all(table(map1000$om)==10))
+stopifnot(all(c("common_median","om_specific") %in% sc$scenario))
+ref <- sc[sc$scenario=="common_median",,drop=FALSE]
+om <- sc[sc$scenario=="om_specific",,drop=FALSE]
+fmt <- function(x,n=3) formatC(as.numeric(x),format="f",digits=n,big.mark=",")
+knitr::opts_chunk$set(echo=FALSE,warning=FALSE,message=FALSE,fig.align="center")
+```
+
+# Condicionamiento del reclutamiento para la proyección
+
+El componente stock--reclutamiento del OM se condicionó a partir de las 100
+realizaciones históricas obtenidas en WD01. Cada OM conserva las trayectorias
+de SSB y reclutamiento correspondientes a su reajuste bootstrap de SS3, con
+la SSB determinada en Q2 y el reclutamiento de edad 0 entrando en Q3 del
+mismo año [@ICES2024WKBANSP; @ICES2025StockAnnex9aS].
+
+A partir de estas trayectorias se parametrizó la relación stock--reclutamiento utilizada durante 2025--2054 y se incorporó el error de proceso del reclutamiento durante la proyección. Las diferencias entre OMs se representan mediante relaciones stock--reclutamiento específicas, mientras que la variabilidad anual dentro de cada trayectoria se incorpora mediante el error de proceso del reclutamiento.
+
+
+# Métodos {#methods}
+
+
+## Diagnóstico y especificación del modelo de reclutamiento
+
+La estructura del reclutamiento se evaluó utilizando la serie histórica
+1989--2024 de SSB en Q2 y reclutamiento en Q3 del mismo año.
+
+### Forma funcional de la relación stock--reclutamiento
+
+Se ajustaron las relaciones Beverton--Holt, Ricker y segmented a los mismos
+pares históricos SSB--reclutamiento mediante `FLSR` y `fmle`. Los modelos se
+compararon mediante log-verosimilitud, AIC y $\Delta$AIC, calculado respecto
+al menor AIC entre los modelos candidatos. También se compararon las curvas
+ajustadas dentro del rango histórico de SSB.
+
+La forma funcional utilizada en el OM de referencia se definió considerando
+la comparación entre modelos y los diagnósticos de residuos.
+
+### Distribución y estructura de los residuos
+
+Los residuos del reclutamiento se calcularon en escala logarítmica como
+
+\[
+e_t=\log(R_t)-\log(\widehat R_t).
+\]
+
+La distribución de los residuos se caracterizó mediante media, desviación
+estándar, asimetría, curtosis y cuantiles empíricos. El supuesto de error
+normal en escala logarítmica se examinó mediante histograma, gráfico Q--Q y
+la prueba de Shapiro--Wilk [@Thorson2014; @Punt2016].
+
+La dependencia temporal se evaluó mediante ACF, PACF, pruebas de Ljung--Box,
+un modelo AR(1) y una prueba de rachas. La relación entre la variabilidad del
+reclutamiento y la SSB se examinó mediante los residuos y sus valores
+absolutos frente a SSB y la correlación de Spearman entre $|e_t|$ y SSB.
+
+Los posibles cambios temporales en el nivel del reclutamiento se examinaron
+mediante análisis de changepoints, breakpoints y la serie de $R/SSB$.
+
+
+### Estabilidad de los parámetros Beverton--Holt
+
+La variación muestral de los parámetros BH se examinó mediante 1.000
+remuestreos con reemplazo de los pares históricos SSB--reclutamiento. Para
+cada remuestreo se reajustó el modelo y se registraron $a$, $b$,
+log-verosimilitud y AIC. Este análisis se utilizó como diagnóstico y no
+introdujo una fuente adicional de variabilidad paramétrica en el OM.
+
+### Especificación retenida para el OM de referencia
+
+Se utilizó una relación Beverton--Holt con desviaciones lognormales del
+reclutamiento independientes entre años. El OM de referencia no incorpora
+sobrecompensación Ricker, regímenes de productividad, varianza dependiente
+de la biomasa, covariables ambientales ni un proceso adicional para eventos
+extremos.
+
+La variación de los parámetros BH entre OMs procede del ajuste de la relación
+stock--reclutamiento a las trayectorias históricas de cada reajuste de SS3.
+
+## Relaciones stock--reclutamiento específicas por OM
+
+Para cada uno de los 100 OMs se extrajeron la SSB de Q2 y el reclutamiento
+de Q3 durante 1989--2024, obteniéndose 36 pares históricos
+SSB--reclutamiento por OM.
+
+Para cada OM se ajustó una relación Beverton--Holt (BH):
+
+\[
+\widehat R_{t,i}=
+\frac{a_i SSB_{t,i}}
+     {b_i+SSB_{t,i}},
+\]
+
+donde \(i\) identifica el OM, \(t\) el año, \(a_i\) el reclutamiento
+asintótico y \(b_i\) la SSB para la cual el reclutamiento esperado
+corresponde a \(a_i/2\).
+
+Inicialmente se obtuvo un ajuste sin restricciones mediante `FLSR` y `fmle`,
+utilizado como diagnóstico. Para la parametrización del OM, \(a_i\) y \(b_i\)
+se restringieron a valores positivos mediante una transformación logarítmica
+y se estimaron minimizando
+
+\[
+Q_i=
+\sum_t
+\left[
+\log R_{t,i}-
+\log \widehat R_{t,i}
+\right]^2,
+\]
+
+mediante el algoritmo Nelder--Mead implementado en `optim`, con
+`maxit = 10000` y `reltol = 1e-12`.
+
+Para cada OM, la variabilidad histórica del reclutamiento alrededor de la
+relación BH se estimó como
+
+\[
+\sigma_{R,i}=
+\operatorname{SD}_t
+\left[
+\log R_{t,i}-
+\log\widehat R_{t,i}
+\right].
+\]
+
+Se requirió código de convergencia cero y valores finitos de \(a_i\),
+\(b_i\) y \(\sigma_{R,i}\) para conservar el ajuste. Los valores positivos
+de \(b_i\), independientemente de su magnitud, no se utilizaron como
+criterio adicional de exclusión.
+## Construcción del componente stock--reclutamiento en `FLSRsim`
+
+Los parámetros \(a_i\) y \(b_i\) estimados para cada OM se incorporaron a un
+objeto `FLSRsim` dentro de la estructura de simulación de FLBEIA
+[@Garcia2017FLBEIA]. La correspondencia entre cada OM y su reajuste bootstrap
+se mantuvo durante esta asignación.
+
+El modelo se especificó como `model = "bevholt"`, con los parámetros
+\(a_i\) y \(b_i\) constantes durante el periodo de proyección para cada OM.
+La estructura estacional mantiene la SSB en Q2 y la entrada del reclutamiento
+en Q3. La proporción de reclutamiento se fijó en uno en Q3 y en cero en los
+restantes trimestres, con `timelag["year", ] = 0` y
+`timelag["season", ] = 2`.
+
+En esta etapa, los multiplicadores de `uncertainty` se fijaron en uno, por lo
+que no se incorporó error de proceso durante la proyección. El error de proceso
+del reclutamiento se incorpora posteriormente sobre esta estructura.
+
+## Expansión de 100 OMs a 1.000 trayectorias
+
+Cada uno de los 100 OMs se replicó 10 veces, generando un conjunto de 1.000
+trayectorias. Las 10 réplicas de cada OM conservan el mismo estado biológico
+y los mismos parámetros stock--reclutamiento \(a_i\), \(b_i\) y
+\(\sigma_{R,i}\) del OM de origen.
+
+La replicación no incorpora una fuente adicional de variabilidad. Las
+diferencias entre las 10 réplicas de un mismo OM se generan posteriormente
+mediante el error de proceso anual del reclutamiento durante la proyección.
+
+## Error de proceso del reclutamiento durante la proyección
+
+El error de proceso del reclutamiento se incorporó anualmente durante
+2025--2054. Se consideraron dos parametrizaciones de la desviación estándar
+de los residuos del reclutamiento.
+
+En la configuración de referencia se utilizó un valor común de
+\(\sigma_R\), definido como la mediana de los valores estimados para los
+100 OMs:
+
+\[
+\sigma_R^{\mathrm{ref}}
+=
+\operatorname{median}_{i=1,\ldots,100}
+\left(\sigma_{R,i}\right).
+\]
+
+En la configuración de sensibilidad, cada trayectoria conservó el valor de
+\(\sigma_R\) estimado para su OM de origen:
+
+\[
+\sigma_{R,j}^{\mathrm{OM}}
+=
+\sigma_{R,\mathrm{OM}(j)},
+\]
+
+donde \(j\) identifica una de las 1.000 trayectorias. Por tanto, las 10
+réplicas de un mismo OM comparten el mismo valor de \(\sigma_R\).
+
+Para cada año y trayectoria se generó una desviación normal estándar:
+
+\[
+z_{t,j}\sim N(0,1).
+\]
+
+La misma matriz de valores \(z_{t,j}\) se utilizó en ambas configuraciones.
+Para cada parametrización \(s\), el error en escala logarítmica se calculó
+como
+
+\[
+\varepsilon_{t,j}^{(s)}
+=
+z_{t,j}\sigma_{R,j}^{(s)},
+\]
+
+y el multiplicador aplicado al reclutamiento como
+
+\[
+m_{t,j}^{(s)}
+=
+\exp\left[
+\varepsilon_{t,j}^{(s)}
+-\frac{1}{2}
+\left(\sigma_{R,j}^{(s)}\right)^2
+\right].
+\]
+
+El término \(-\sigma_R^2/2\) corresponde a la corrección de sesgo de la
+distribución lognormal, de modo que
+
+\[
+E\left[m_{t,j}^{(s)}\right]=1
+\]
+
+[@Maunder2006].
+
+Los multiplicadores se aplicaron exclusivamente al reclutamiento de Q3
+durante 2025--2054. En Q1, Q2 y Q4 los multiplicadores se mantuvieron
+iguales a uno.
+
+De esta forma, las diferencias entre los 100 OMs proceden de sus
+trayectorias históricas y de los parámetros de sus relaciones
+stock--reclutamiento, mientras que las diferencias entre las 10 réplicas
+de un mismo OM proceden del error de proceso anual del reclutamiento
+durante la proyección [@Punt2016].
+
+## Controles de implementación
+
+Se comprobó que: (i) los 100 ajustes BH presentaran convergencia y parámetros
+finitos; (ii) se mantuviera la correspondencia entre cada OM, su reajuste
+bootstrap y sus parámetros stock--reclutamiento; (iii) cada OM tuviera 10
+réplicas; (iv) los multiplicadores del reclutamiento fueran positivos y
+finitos; y (v) estos multiplicadores se aplicaran exclusivamente en Q3 durante
+2025--2054.
+
+Para la configuración de referencia, se comprobó además que la desviación
+estándar realizada de las desviaciones logarítmicas difiriera en menos de
+0.01 del valor de \(\sigma_R^{\mathrm{ref}}\) utilizado para generarlas.
+
+Para la configuración específica por OM, las desviaciones estándar realizadas
+se calcularon por trayectoria y se conservaron como diagnóstico. No se aplicó
+un criterio de aceptación basado en su correspondencia exacta con
+\(\sigma_{R,i}\), dado que cada trayectoria contiene 30 realizaciones anuales.
+
+
+# Resultados {#results}
+
+
+## Diagnóstico del modelo y especificación retenida
+
+La comparación de las relaciones Beverton--Holt, Ricker y segmented se
+presenta en la Tabla \@ref(tab:sr-model-comparison). Los modelos se compararon
+mediante log-verosimilitud, AIC y $\Delta$AIC. La Figura \@ref(fig:sr-candidate-curves) muestra las relaciones ajustadas dentro del rango histórico de SSB.
+
+```{r sr-model-comparison}
+sr_models_table <- sr_models
+names(sr_models_table) <- c("Modelo","logLik","AIC","Delta AIC")
+
+knitr::kable(sr_models_table,digits=3,booktabs=TRUE,
+             caption="Comparación de las formulaciones Beverton–Holt, Ricker y segmented ajustadas a la serie histórica Q2 SSB–Q3 reclutamiento. Delta AIC se calcula respecto al menor AIC entre los modelos candidatos.") |>
+  kableExtra::kable_styling(latex_options="hold_position",position="center")
+
+```
+
+
+```{r sr-candidate-curves, fig.cap="Comparación de las relaciones stock–reclutamiento Beverton–Holt, Ricker y segmented ajustadas a Q2 SSB y Q3 reclutamiento durante 1989–2024. Las líneas verticales indican Blim y Bpa.", out.width="90%",fig.align="center"}
+
+candidate_curve_figure <- file.path(diag_fig_dir,"18_compensation_vs_overcompensation_BH_Ricker_segmented.png")
+
+if(!file.exists(candidate_curve_figure)) stop("Run 05b_recruitment_model_diagnostics.R to create the candidate SR figure")
+
+knitr::include_graphics(candidate_curve_figure)
+```
+
+### Residuos y error de proceso
+
+La distribución de los residuos logarítmicos del reclutamiento se resume en
+la Tabla \@ref(tab:sr-residual-summary). La Figura
+\@ref(fig:sr-residual-diagnostics) muestra la serie temporal de los residuos,
+su distribución, el gráfico Q--Q y su relación con la SSB.
+
+La dependencia temporal se resume en la Tabla
+\@ref(tab:sr-temporal-summary), incluyendo el coeficiente AR(1) y la prueba
+de rachas.
+
+```{r sr-residual-summary}
+sr_resid_table <- data.frame(
+  Diagnostico=c("Años","Media residual","SD residual","sigmaR usado","Fuente de sigmaR","Asimetría","Curtosis","P05","Mediana","P95","Mínimo","Máximo","Proporción dentro de ±1.96 sigmaR"),
+  Valor=c(sr_resid$n_years,sr_resid$mean_resid,sr_resid$sd_resid,sr_resid$sigmaR_used,sr_resid$sigmaR_source,sr_resid$skewness,sr_resid$kurtosis,sr_resid$q05,sr_resid$median,sr_resid$q95,sr_resid$min_resid,sr_resid$max_resid,sr_resid$prop_inside_sigmaR_95)
+)
+knitr::kable(sr_resid_table,booktabs=TRUE,align=c("l","r"),
+             caption="Resumen de los residuos logarítmicos del reclutamiento del ajuste de referencia.") |>
+  kableExtra::kable_styling(latex_options="hold_position",position="center") |>
+  kableExtra::column_spec(1,width="7cm") |>
+  kableExtra::column_spec(2,width="4cm")
+```
+
+
+
+```{r sr-residual-diagnostics, fig.cap="Diagnósticos de los residuos logarítmicos del reclutamiento utilizados para evaluar el supuesto de error de proceso: serie temporal, distribución, gráfico Q–Q y residuos frente a SSB.", out.width="48%", fig.show="hold"}
+
+residual_figures <- file.path(diag_fig_dir,c("03_OM_residuals_time_series_sigmaR.png",
+                                             "04_OM_residual_distribution_vs_sigmaR.png",
+                                             "05_OM_residual_QQplot.png","06_OM_residuals_vs_SSB_sigmaR.png"))
+
+if(!all(file.exists(residual_figures))) stop("Run 05b_recruitment_model_diagnostics.R to create the residual diagnostic figures")
+knitr::include_graphics(residual_figures)
+
+```
+
+
+
+```{r sr-temporal-summary}
+sr_temporal_table <- sr_temporal
+sr_temporal_table$diagnostic <- c("AR(1), phi","Intercepto AR(1)","Runs test")
+names(sr_temporal_table) <- c("Diagnóstico","Estimación","p-value")
+knitr::kable(sr_temporal_table,digits=4,booktabs=TRUE,
+             caption="Resumen de los diagnósticos de dependencia temporal de los residuos del reclutamiento.") |>
+  kableExtra::kable_styling(latex_options="hold_position",position="center")
+```
+
+### Estabilidad de los parámetros
+
+De los 1.000 remuestreos de los pares históricos SSB--reclutamiento,
+`r sr_boot$n_success` produjeron ajustes (`r fmt(100*sr_boot$success_rate,1)`%).
+La distribución de los parámetros \(a\) y \(b\) obtenida en estos ajustes se
+resume en la Tabla \@ref(tab:sr-parameter-stability).
+
+La Tabla \@ref(tab:sr-conditioning-decisions-table) resume los diagnósticos y la
+especificación retenida para el reclutamiento del OM de referencia.
+
+```{r sr-parameter-stability}
+sr_boot_table <- data.frame(
+  Parametro=c("a (individuos)","b (t)"),
+  P05=c(sr_boot$a_q05,sr_boot$b_q05),
+  P25=c(NA,sr_boot$b_q25),
+  Mediana=c(sr_boot$a_median,sr_boot$b_median),
+  P75=c(NA,sr_boot$b_q75),
+  P95=c(sr_boot$a_q95,sr_boot$b_q95)
+)
+knitr::kable(sr_boot_table,digits=2,booktabs=TRUE,caption="Distribución bootstrap de los parámetros Beverton–Holt en los ajustes exitosos.") |>
+  kableExtra::kable_styling(latex_options="hold_position",position="center")
+```
+
+
+```{r sr-conditioning-decisions-table}
+
+sr_decisions_table <- sr_decisions
+names(sr_decisions_table) <- c("Componente","Diagnóstico","OM de referencia")
+knitr::kable(sr_decisions_table,booktabs=TRUE,longtable=TRUE,escape=TRUE,caption="Síntesis de los diagnósticos de reclutamiento y de las decisiones retenidas para el OM de referencia.") |>
+  kableExtra::kable_styling(latex_options="repeat_header",font_size=7) |>
+  kableExtra::column_spec(1,width="4.0cm") |>
+  kableExtra::column_spec(2,width="6.3cm") |>
+  kableExtra::column_spec(3,width="4.0cm")
+
+```
+
+## Parametrización de las relaciones stock--reclutamiento
+
+Los `r sum(bh$convergence==0)` ajustes BH específicos por OM presentaron
+código de convergencia cero. La mediana de \(a\) fue
+`r fmt(median(bh$a),0)` individuos y la de \(b\)
+`r fmt(median(bh$b),1)` t. En `r sum(bh$b<1)` OMs se obtuvo \(b<1\) t.
+
+En los ajustes diagnósticos sin restricciones se obtuvieron
+`r sum(free$b<=0,na.rm=TRUE)` valores de \(b\leq0\). La parametrización
+positiva utilizada en el OM mantuvo estos OMs mediante la restricción
+\(b_i>0\).
+
+La distribución de \(a\), \(b\) y \(\sigma_R\) entre los 100 OMs se presenta
+en la Tabla \@ref(tab:bh-summary). La Figura \@ref(fig:bh-curves) muestra las
+100 relaciones BH utilizadas durante la proyección.
+
+```{r bh-summary}
+bh_table <- data.frame(
+  Parametro=c("a (individuos)","b (t)","sigmaR"),
+  P05=c(quantile(bh$a,.05),quantile(bh$b,.05),quantile(bh$sigmaR,.05)),
+  Mediana=c(median(bh$a),median(bh$b),median(bh$sigmaR)),
+  P95=c(quantile(bh$a,.95),quantile(bh$b,.95),quantile(bh$sigmaR,.95))
+)
+knitr::kable(bh_table,digits=3,booktabs=TRUE,caption="Distribución de los parámetros Beverton–Holt y de la desviación estándar histórica de los residuos del reclutamiento entre los 100 OMs condicionados.") |>
+  kableExtra::kable_styling(latex_options="hold_position",position="center")
+```
+
+
+```{r bh-curves, fig.cap="Relaciones Beverton–Holt utilizadas para parametrizar el componente stock–reclutamiento de los 100 OMs condicionados. Las líneas representan relaciones específicas por OM y la línea negra corresponde a la mediana puntual sobre el rango histórico de SSB.", out.width="90%",fig.align="center"}
+bh_figure <- file.path(fig_dir,"BH_reference_100OMs.png")
+if(!file.exists(bh_figure)) bh_figure <- file.path(rds_dir,"BH_reference_100OMs.png")
+if(!file.exists(bh_figure)) stop("Run updated script 07 to create the BH figure")
+knitr::include_graphics(bh_figure)
+```
+
+## Variabilidad histórica del reclutamiento
+
+Los valores de \(\sigma_R\) estimados para los 100 OMs variaron entre
+`r fmt(sig$minimum,4)` y `r fmt(sig$maximum,4)`, con una mediana de
+`r fmt(sig$median,4)` (Tabla \@ref(tab:sigma-summary)).
+
+```{r sigma-summary}
+sig_table <- sig
+names(sig_table) <- c("n OMs","Mínimo","P05","Mediana","Media","P95","Máximo")
+knitr::kable(sig_table,digits=4,booktabs=TRUE,caption="Distribución de las desviaciones estándar históricas de los residuos logarítmicos del reclutamiento entre los 100 OMs.") |>
+  kableExtra::kable_styling(latex_options="hold_position",position="center")
+```
+
+## Error de proceso del reclutamiento durante la proyección
+
+La configuración de referencia utilizó
+\(\sigma_R=\) `r fmt(ref$sigmaR_median,4)` en las 1.000 trayectorias.
+En la configuración específica por OM, los valores asignados variaron entre
+`r fmt(om$sigmaR_min,4)` y `r fmt(om$sigmaR_max,4)`.
+
+Las medias realizadas de los multiplicadores fueron
+`r fmt(ref$mean_multiplier,6)` y `r fmt(om$mean_multiplier,6)`,
+respectivamente (Tabla \@ref(tab:scenario-summary)). Sus distribuciones se
+muestran en la Figura \@ref(fig:process-error).
+
+```{r scenario-summary}
+
+scenario_table <- sc[, c(
+  "scenario",
+  "n_trajectories",
+  "sigmaR_min",
+  "sigmaR_median",
+  "sigmaR_max",
+  "mean_multiplier",
+  "median_multiplier"
+)]
+
+names(scenario_table) <- c(
+  "Configuración",
+  "n",
+  "sigmaR mín.",
+  "sigmaR mediana",
+  "sigmaR máx.",
+  "Media multiplicador",
+  "Mediana multiplicador"
+)
+
+scenario_table$Configuración[
+  scenario_table$Configuración == "common_median"
+] <- "Mediana común"
+
+scenario_table$Configuración[
+  scenario_table$Configuración == "om_specific"
+] <- "Específica por OM"
+
+knitr::kable(
+  scenario_table,
+  digits = 4,
+  booktabs = TRUE,
+  caption = paste(
+    "Parametrización y resumen de los multiplicadores del error de proceso",
+    "del reclutamiento para la configuración de referencia y la configuración",
+    "específica por OM durante 2025–2054."
+  )
+) |>
+  kableExtra::kable_styling(
+    latex_options = c("hold_position", "scale_down"),
+    position = "center"
+  )
+```
+
+La Figura \@ref(fig:process-error) compara las distribuciones de los
+multiplicadores generados con ambas parametrizaciones. Ambas configuraciones
+utilizan la misma matriz de desviaciones normales estándar; las diferencias
+entre las distribuciones resultan de los valores de \(\sigma_R\) utilizados
+para escalar las desviaciones.
+
+```{r process-error,fig.cap="Distribución de los multiplicadores del error de proceso del reclutamiento durante 2025--2054 para la configuración de referencia y la configuración específica por OM. Ambas configuraciones utilizan las mismas desviaciones normales estándar para las 1.000 trayectorias.", out.width="90%",fig.align="center"}
+
+process_figure <- file.path(fig_dir,"recruitment_process_error_scenarios.png")
+if(!file.exists(process_figure)) stop("Run script 09 to create the process-error figure")
+knitr::include_graphics(process_figure)
+```
+
+
+
+# Reproducibilidad {#reproducibility}
+
+La secuencia de construcción para este componente es `05b_recruitment_model_diagnostics.R` → `06_fit_SR_bootstrap.R` → `07_build_SR_reference.R` → `08_expand_OM_100_to_1000.R` → `09_recruitment_process_error_with_robustness.R`. Los scripts parten de los 100 OMs generados durante el condicionamiento histórico y producen los objetos SR utilizados posteriormente en las proyecciones del OM.
+
+`06_fit_SR_bootstrap.R` genera los ajustes BH y las estimaciones de \(\sigma_R\); `07_build_SR_reference.R` construye el `FLSRsim` para los 100 OMs; `08_expand_OM_100_to_1000.R` expande los objetos a 1.000 trayectorias; y `09_recruitment_process_error_with_robustness.R` genera y asigna los multiplicadores futuros de reclutamiento. La semilla utilizada para el error de proceso es `1234`.
+
+Los objetos finales son `SRs_reference_1000iter_process_error.rds` y `SRs_om_specific_1000iter_process_error.rds`. Las desviaciones, multiplicadores y la matriz compartida de desviaciones normales estándar se guardan en `data/Rdata`, mientras que las tablas y figuras utilizadas por este WD se guardan en `outputs/recruitment/tables` y `outputs/recruitment/figures`.
+
+
+# Conclusiones
+
+- Los 100 OMs se parametrizaron mediante relaciones Beverton--Holt específicas
+  a partir de SSB de Q2 y reclutamiento de Q3 durante 1989--2024.
+
+- Cada OM conserva los parámetros \(a_i\), \(b_i\) y \(\sigma_{R,i}\)
+  correspondientes a su reajuste bootstrap de SS3.
+
+- Cada OM se replicó 10 veces para generar 1.000 trayectorias. Esta replicación
+  no incorpora variabilidad adicional.
+
+- La configuración de referencia utiliza un valor común de \(\sigma_R\),
+  definido como la mediana de los valores estimados para los 100 OMs. La
+  configuración de sensibilidad conserva el \(\sigma_R\) específico de cada OM.
+
+- El error de proceso se aplica anualmente al reclutamiento de Q3 durante
+  2025--2054, utilizando las mismas desviaciones normales estándar en ambas
+  configuraciones.
+  
+
+# Referencias

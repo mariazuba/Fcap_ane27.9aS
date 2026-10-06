@@ -1,0 +1,888 @@
+---
+title: "Incertidumbre de la evaluación para el shortcut MSE de ane.27.9aS"
+author:
+  - "María José Zúñiga Basualto"
+  - "Fernando Ramos"
+  - "María Ángeles Gamaza"
+date: "`r format(Sys.Date(), '%d-%m-%Y')`"
+
+output:
+  bookdown::pdf_document2:
+    toc: false
+    toc_depth: 3
+    number_sections: true
+    keep_tex: false
+
+bibliography: report_biblio.bib
+csl: ices-journal-of-marine-science.csl
+link-citations: true
+
+header-includes:
+  - \usepackage{adjustbox}
+---
+
+
+**Working Document 05 — WKSPSIM 2026**
+
+**Stock:** Anchovy (*Engraulis encrasicolus*) in the southern part of Division 9.a  
+(Gulf of Cadiz and southern part of Portugal), ane.27.9aS
+
+**Affiliation:** Instituto Español de Oceanografía (IEO-CSIC), Centro Oceanográfico de Cádiz, Spain
+
+
+
+
+```{r setup, include=FALSE}
+library(knitr)
+library(here)
+library(dplyr)
+library(tidyr)
+
+fig_dir <- here("outputs","assessment_error","figures")
+tab_dir <- here("outputs","assessment_error","tables")
+rds_dir <- here("data","Rdata")
+
+# Reproducible tabular outputs used by inline R expressions.
+# They must be loaded in setup because inline expressions are evaluated
+# before the later table chunks in which the same files are displayed.
+assessment_parameters <- read.csv(
+  file.path(tab_dir,"01_assessment_error_parameters.csv"),
+  check.names=FALSE
+)
+
+assessment_temporal <- read.csv(
+  file.path(tab_dir,"02_assessment_error_temporal_structure.csv")
+)
+
+emulator_validation <- read.csv(
+  file.path(tab_dir,"03_emulator_validation.csv")
+)
+
+assessment_par_rds <- readRDS(
+  file.path(rds_dir,"assessment_error_parameters.rds")
+)
+
+assessment_revisions_rds <- readRDS(
+  file.path(rds_dir,"assessment_error_historical_revisions.rds")
+)
+
+emulator_reference_rds <- readRDS(
+  file.path(rds_dir,"assessment_error_simulated_reference.rds")
+)
+
+assessment_error_reference <- readRDS(
+  file.path(rds_dir,"assessment_error_reference_1000iter.rds")
+)
+
+variables <- c("SSB","F","R")
+
+error_wide_wd <- assessment_revisions_rds %>%
+  dplyr::select(update_year,variable,log_error) %>%
+  tidyr::pivot_wider(names_from=variable,values_from=log_error) %>%
+  tidyr::drop_na(dplyr::all_of(variables)) %>%
+  dplyr::arrange(update_year)
+
+ssb_f_loo_wd <- lapply(error_wide_wd$update_year,function(y) {
+  x <- dplyr::filter(error_wide_wd,update_year!=y)
+  data.frame(
+    omitted_year=y,
+    Pearson=cor(x$SSB,x$F,method="pearson"),
+    Spearman=cor(x$SSB,x$F,method="spearman")
+  )
+}) %>%
+  dplyr::bind_rows()
+
+ssb_f_loo_summary_wd <- ssb_f_loo_wd %>%
+  dplyr::summarise(
+    Pearson_min=min(Pearson),
+    Pearson_max=max(Pearson),
+    Spearman_min=min(Spearman),
+    Spearman_max=max(Spearman)
+  )
+
+emulator_cor_wd <- cor(emulator_reference_rds[,variables])
+
+ae_multiplier <- assessment_error_reference$multiplier
+ae_log_multiplier <- log(ae_multiplier)
+ae_generated_mean <- apply(ae_log_multiplier,3,mean)
+ae_generated_sd <- apply(ae_log_multiplier,3,sd)
+ae_generated_cor <- cor(
+  matrix(
+    ae_log_multiplier,
+    ncol=3,
+    dimnames=list(NULL,variable=dimnames(ae_multiplier)$variable)
+  )
+)
+
+knitr::opts_chunk$set(
+  echo=FALSE,
+  warning=FALSE,
+  message=FALSE,
+  fig.align="center"
+)
+
+# ============================================================
+# HELPER: FORMAT TABLES FOR PDF
+# ============================================================
+# Keeps tables at their natural width when they fit within the text area.
+# Tables wider than the available text width are scaled down, but never enlarged.
+# Scientific content and underlying CSV outputs are not modified.
+
+latex_table_fit <- function(x,caption,label,digits=3,align=NULL,font_size="small") {
+
+  tab <- knitr::kable(
+    x,
+    format="latex",
+    booktabs=TRUE,
+    digits=digits,
+    align=align,
+    caption=NULL
+  )
+
+  cat("\\begin{table}[!htbp]\n")
+  cat("\\centering\n")
+  cat("\\caption{",caption,"}\n",sep="")
+  cat("\\label{",label,"}\n",sep="")
+  cat("\\",font_size,"\n",sep="")
+  cat("\\begin{adjustbox}{max width=\\textwidth}\n")
+  cat(tab)
+  cat("\n\\end{adjustbox}\n")
+  cat("\\end{table}\n")
+}
+```
+
+
+# Enfoque general
+
+La Evaluación de Estrategias de Gestión (*Management Strategy Evaluation*,
+MSE) utiliza simulaciones en ciclo cerrado para representar la dinámica de la
+población, la percepción del estado del stock y la aplicación de medidas de
+gestión [@Punt2016].
+
+En un MSE completo (*full MSE*), el modelo de evaluación puede ejecutarse
+durante cada ciclo de gestión utilizando los datos generados por el Modelo
+Operativo (*Operating Model*, OM). En el *shortcut MSE* desarrollado para el
+boquerón del Golfo de Cádiz (*Engraulis encrasicolus*, ane.27.9aS), Stock
+Synthesis 3 (SS3) no se reajusta durante la proyección. La incertidumbre de la
+evaluación se representa mediante un emulador estadístico que introduce error
+en la percepción de las cantidades del stock utilizadas por el procedimiento
+de gestión [@Wiedenmann2015; @ICES2020].
+
+El ciclo de simulación distingue, por tanto, entre el estado de la población
+representado por el OM y el estado percibido utilizado por el procedimiento
+de gestión:
+
+\[
+\text{Operating Model}
+\longrightarrow
+\text{assessment-error emulator}
+\longrightarrow
+\text{Management Procedure}
+\longrightarrow
+\text{management action}
+\longrightarrow
+\text{Operating Model}.
+\]
+
+La incertidumbre de evaluación se mantiene separada de la incertidumbre
+utilizada para condicionar el OM. Los 100 OMs representan condiciones
+alternativas de la población derivadas del condicionamiento histórico,
+mientras que el *assessment error* representa el error en la percepción de
+esas condiciones durante la proyección.
+
+El emulador se parametrizó a partir de las revisiones históricas de la
+evaluación SS3 de ane.27.9aS. Estas revisiones se utilizaron para estimar el
+sesgo, la variabilidad, la correlación entre variables y la dependencia
+temporal del error de evaluación.
+
+El *assessment error* se parametrizó conjuntamente para biomasa desovante
+(SSB), mortalidad por pesca (\(F\)) y reclutamiento (\(R\)). Las tres
+variables se conservan en el objeto de error de evaluación. El MP de
+referencia documentado en WD06 utiliza los multiplicadores de SSB y F,
+mientras que el error de evaluación del reclutamiento permanece desactivado.
+
+Este WD05 documenta la parametrización y validación del error de evaluación
+utilizado en el *shortcut MSE*. El WD06 documenta su incorporación al estado
+percibido utilizado por el MP y los WD posteriores evalúan sus consecuencias
+sobre el desempeño de los procedimientos de gestión.
+
+
+# Métodos {#methods}
+
+## Caracterización histórica del *assessment error* {#historical-ae}
+
+### Evaluaciones SS3 utilizadas
+
+El *assessment error* se parametrizó a partir de una secuencia de evaluaciones
+SS3 con años terminales entre 2004 y 2024. Las evaluaciones utilizaron la
+misma configuración del modelo y difirieron en el año terminal.
+
+Para cada ejecución se comprobó la convergencia mediante el gradiente máximo
+reportado por SS3. Se incluyeron las ejecuciones que cumplieron
+
+\[
+\text{max gradient}<0.001.
+\]
+
+Para el cálculo del *assessment error* se utilizaron estimaciones positivas y
+finitas de biomasa desovante (SSB), mortalidad por pesca (\(F\)) y
+reclutamiento (\(R\)).
+
+La secuencia proporcionó 20 actualizaciones anuales para el período
+2005--2024.
+
+### Revisiones anuales
+
+Para cada variable \(X\) y año de actualización \(t\), se comparó la
+estimación del año \(t-1\) obtenida en la evaluación con año terminal \(t-1\)
+con la estimación del mismo año obtenida en la evaluación con año terminal
+\(t\):
+
+\[
+e_{X,t}
+=
+\log
+\left(
+\frac{\hat X_{t-1}^{(t-1)}}
+     {\hat X_{t-1}^{(t)}}
+\right),
+\]
+
+donde \(\hat X_{t-1}^{(t-1)}\) corresponde a la estimación disponible antes
+de incorporar el nuevo año de información y \(\hat X_{t-1}^{(t)}\) a la
+estimación revisada después de incorporarlo.
+
+También se calculó la revisión relativa:
+
+\[
+r_{X,t}
+=
+\frac{\hat X_{t-1}^{(t-1)}}
+     {\hat X_{t-1}^{(t)}}-1.
+\]
+
+Con esta definición, valores positivos indican que la estimación previa fue
+superior a la revisada y valores negativos que fue inferior.
+
+Las revisiones se utilizaron como proxy del error de evaluación. No
+representan diferencias respecto del estado verdadero del stock, que no es
+observado. Su uso permite caracterizar los cambios en las estimaciones
+producidos al incorporar información adicional al assessment
+[@Mohn1999; @HurtadoFerro2015].
+
+### Parametrización del error
+
+Para cada actualización, las log-revisiones de SSB, \(F\) y \(R\) se
+organizaron en el vector
+
+\[
+\mathbf e_t=
+\begin{pmatrix}
+e_{\mathrm{SSB},t}\\
+e_{F,t}\\
+e_{R,t}
+\end{pmatrix}.
+\]
+
+A partir de los \(n=20\) vectores se estimaron el vector de medias
+
+\[
+\boldsymbol{\mu}
+=
+\frac{1}{n}
+\sum_{t=1}^{n}\mathbf e_t
+\]
+
+y la matriz de varianzas--covarianzas
+
+\[
+\boldsymbol{\Sigma}
+=
+\operatorname{Cov}(\mathbf e_t).
+\]
+
+La media empírica se mantuvo en la parametrización y no se aplicó la
+corrección
+
+\[
+-\frac{\sigma_X^2}{2}.
+\]
+
+Por tanto, los multiplicadores generados a partir de las log-revisiones
+conservan el sesgo medio estimado a partir de las revisiones históricas y no
+se ajustan para imponer una esperanza igual a uno en escala multiplicativa.
+
+La matriz \(\boldsymbol{\Sigma}\) se utilizó completa, conservando la
+covariación estimada entre las revisiones de SSB, \(F\) y \(R\).
+
+La estabilidad de la relación entre las revisiones de SSB y \(F\) se examinó
+mediante un análisis *leave-one-year-out*. Para cada año de actualización se
+eliminó el vector correspondiente y se recalcularon las correlaciones de
+Pearson y Spearman entre ambas variables.
+
+### Estructura temporal
+
+La dependencia temporal de las revisiones se evaluó separadamente para SSB,
+\(F\) y \(R\) mediante
+
+\[
+e_{X,t}
+=
+\alpha_X+
+\phi_X e_{X,t-1}
++
+\varepsilon_{X,t}.
+\]
+
+Para cada variable se estimó el coeficiente de primer orden \(\phi_X\) y su
+valor de \(p\). Estos resultados se utilizaron para definir la dependencia
+temporal del error de evaluación en el escenario de referencia.
+
+## Emulador del *assessment error* {#ae-emulator}
+
+En el *shortcut MSE*, SS3 no se reajusta durante cada ciclo anual de gestión.
+La incertidumbre de la evaluación se representa mediante un emulador
+estadístico parametrizado a partir de las revisiones históricas descritas en
+la Sección \@ref(historical-ae).
+
+El modelo de referencia genera, para cada año \(t\),
+
+\[
+\mathbf e_t
+\overset{\mathrm{iid}}{\sim}
+\mathcal{N}_3
+\left(
+\boldsymbol{\mu},
+\boldsymbol{\Sigma}
+\right).
+\]
+
+La independencia se aplica entre años, mientras que la dependencia entre SSB,
+\(F\) y \(R\) dentro de cada año está determinada por
+\(\boldsymbol{\Sigma}\).
+
+Para cada variable \(X\), el error se transforma a escala multiplicativa
+mediante
+
+\[
+M_{X,t}
+=
+\exp(e_{X,t}).
+\]
+
+Durante la simulación *closed-loop*, las cantidades percibidas se obtienen
+como
+
+\[
+X^{\mathrm{perc}}_t
+=
+X^{\mathrm{true}}_t M_{X,t},
+\]
+
+donde \(X^{\mathrm{true}}_t\) corresponde al estado generado por el OM y
+\(X^{\mathrm{perc}}_t\) al estado percibido utilizado por el procedimiento
+de gestión.
+
+Este WD parametriza y valida el generador de *assessment error*. La aplicación
+de los multiplicadores al estado percibido y su propagación hacia el consejo
+de gestión se comprueban posteriormente con la Management Procedure
+\(F_{cap}+B_{esc}\).
+
+## Validación del emulador {#ae-validation}
+
+### Validación interna
+
+La implementación del modelo multivariante se comprobó mediante 10 000
+realizaciones independientes:
+
+\[
+\mathbf e_s
+\sim
+\mathcal{N}_3
+\left(
+\boldsymbol{\mu},
+\boldsymbol{\Sigma}
+\right),
+\qquad s=1,\ldots,10000.
+\]
+
+Se utilizó una semilla fija (`set.seed(123)`). Para cada variable se
+calcularon la media y la desviación estándar de las realizaciones, junto con
+la matriz de correlación entre variables. Estos estadísticos se compararon
+con el vector \(\boldsymbol{\mu}\), las desviaciones estándar derivadas de
+\(\boldsymbol{\Sigma}\) y la matriz de correlación utilizada para parametrizar
+el emulador.
+
+Este control evalúa si el generador reproduce los momentos y la estructura de
+correlación especificados. No evalúa el supuesto de normalidad multivariante
+de las revisiones históricas.
+
+Se generaron adicionalmente cinco secuencias temporales como diagnóstico
+gráfico del proceso de referencia. Estas secuencias no forman parte de las
+1000 realizaciones utilizadas posteriormente en el MSE.
+
+### Validación mediante retrospectivas convencionales {#external-validation}
+
+La validación mediante información no utilizada en la parametrización se
+realizó con retrospectivas convencionales de SS3 correspondientes a *peels*
+de -1 a -5. Estas ejecuciones no se utilizaron para estimar
+\(\boldsymbol{\mu}\) ni \(\boldsymbol{\Sigma}\).
+
+Para cada variable \(X\) y *peel* \(k\), el error retrospectivo observado se
+calculó como
+
+\[
+E^{\mathrm{obs}}_{X,k}
+=
+\log
+\left(
+\frac{\hat X^{(-k)}_{Y-k}}
+     {\hat X^{(0)}_{Y-k}}
+\right),
+\]
+
+donde \(Y\) corresponde al año terminal de la evaluación completa,
+\(\hat X^{(-k)}_{Y-k}\) a la estimación terminal del retrospectivo del
+*peel* \(k\), y \(\hat X^{(0)}_{Y-k}\) a la estimación del mismo año en la
+evaluación completa.
+
+Dado que un *peel* de \(k\) años representa la acumulación de \(k\)
+actualizaciones anuales, el error retrospectivo simulado se calculó como
+
+\[
+E^{\mathrm{sim}}_{X,k}
+=
+\sum_{j=1}^{k}e_{X,j}.
+\]
+
+Se generaron 10 000 secuencias de cinco errores anuales. Para cada variable y
+*peel* se calcularon la mediana y los percentiles 5 y 95 de
+\(E^{\mathrm{sim}}_{X,k}\), y el error retrospectivo observado se comparó con
+esta distribución.
+
+Como segundo diagnóstico se calculó Mohn's rho [@Mohn1999]:
+
+\[
+\rho_X
+=
+\frac{1}{K}
+\sum_{k=1}^{K}
+\left[
+\frac{\hat X^{(-k)}_{Y-k}}
+     {\hat X^{(0)}_{Y-k}}
+-1
+\right],
+\]
+
+con \(K=5\).
+
+El mismo estadístico se calculó para cada secuencia simulada. Para cada
+variable se obtuvieron la mediana y los percentiles 5 y 95 de la distribución
+simulada de \(\rho_X\), que se compararon con el valor observado. Mohn's rho
+se utilizó para caracterizar el patrón retrospectivo y no como una estimación
+del error respecto del estado verdadero de la población
+[@Mohn1999; @HurtadoFerro2015].
+
+Como tercer diagnóstico se evaluó la persistencia del signo de los errores
+retrospectivos. Para cada variable se contabilizó el número de *peels* con
+errores positivos y negativos. El mismo cálculo se realizó para cada
+secuencia simulada y se estimó la frecuencia con que el patrón direccional
+observado apareció en las simulaciones.
+
+## Generación de las realizaciones utilizadas en el MSE {#closed-loop-ae}
+
+Una vez parametrizado y validado el emulador, se generaron las realizaciones
+de *assessment error* utilizadas posteriormente en el MSE.
+
+Para cada año \(t\) e iteración \(i\),
+
+\[
+\mathbf e_{t,i}
+\overset{\mathrm{iid}}{\sim}
+\mathcal{N}_3
+\left(
+\boldsymbol{\mu},
+\boldsymbol{\Sigma}
+\right),
+\]
+
+y los multiplicadores se calcularon como
+
+\[
+\mathbf M_{t,i}
+=
+\exp(\mathbf e_{t,i}).
+\]
+
+La generación utilizó una semilla fija (`set.seed(123)`) y produjo 1000
+realizaciones para los años de evaluación 2024--2053. El objeto resultante
+tiene dimensiones
+
+\[
+30\ \text{años}
+\times
+1000\ \text{iteraciones}
+\times
+3\ \text{variables}.
+\]
+
+Antes de guardar el objeto se comprobó que las dimensiones correspondieran a
+la configuración especificada, que las variables fueran SSB, \(F\) y \(R\),
+y que todos los multiplicadores fueran finitos y positivos.
+
+Como control de la generación final, los multiplicadores se transformaron
+nuevamente a escala logarítmica y se calcularon sus medias, desviaciones
+estándar y correlaciones. Estos estadísticos se compararon con
+\(\boldsymbol{\mu}\), las desviaciones estándar y la matriz de correlación
+utilizadas para parametrizar el emulador.
+
+La aplicación posterior de los multiplicadores se define como
+
+\[
+X^{\mathrm{perc}}_{t,i}
+=
+X^{\mathrm{true}}_{t,i}
+M_{X,t,i}.
+\]
+
+Esta transformación no se aplica ni se valida en este WD. Su implementación
+sobre el estado percibido utilizado por la Management Procedure se documenta
+en WD06.
+
+
+# Resultados {#results}
+
+## Revisiones históricas y parametrización {#results-parameterisation}
+
+Se obtuvieron 20 vectores anuales de revisión para SSB, \(F\) y reclutamiento,
+correspondientes a las actualizaciones de las evaluaciones SS3 entre 2005 y
+2024. Las trayectorias de las evaluaciones utilizadas para calcular las
+revisiones se presentan en la Figura \@ref(fig:fig-assessment-trajectories).
+
+```{r fig-assessment-trajectories, out.width="75%", fig.cap="Trayectorias de las evaluaciones SS3 utilizadas para calcular las revisiones anuales. Cada línea corresponde a una evaluación con un año terminal entre 2004 y 2024."}
+knitr::include_graphics(file.path(fig_dir,"01_historical_assessment_trajectories.png"))
+```
+
+Las medias de las log-revisiones fueron
+`r sprintf("%.3f",assessment_par_rds$mu["SSB"])` para SSB,
+`r sprintf("%.3f",assessment_par_rds$mu["F"])` para \(F\) y
+`r sprintf("%.3f",assessment_par_rds$mu["R"])` para reclutamiento. Las
+desviaciones estándar fueron
+`r sprintf("%.3f",sqrt(diag(assessment_par_rds$Sigma))["SSB"])`,
+`r sprintf("%.3f",sqrt(diag(assessment_par_rds$Sigma))["F"])` y
+`r sprintf("%.3f",sqrt(diag(assessment_par_rds$Sigma))["R"])`,
+respectivamente (Tabla \@ref(tab:assessment-parameters)).
+Las correlaciones entre las log-revisiones fueron
+`r sprintf("%.3f",assessment_par_rds$correlation["SSB","F"])` para SSB--\(F\),
+`r sprintf("%.3f",assessment_par_rds$correlation["SSB","R"])` para SSB--\(R\)
+y `r sprintf("%.3f",assessment_par_rds$correlation["F","R"])` para \(F\)--\(R\)
+(Tabla \@ref(tab:assessment-parameters)).
+En el análisis leave-one-year-out, la correlación SSB--\(F\) varió entre
+`r sprintf("%.3f",ssb_f_loo_summary_wd$Pearson_min)` y
+`r sprintf("%.3f",ssb_f_loo_summary_wd$Pearson_max)` para Pearson, y entre
+`r sprintf("%.3f",ssb_f_loo_summary_wd$Spearman_min)` y
+`r sprintf("%.3f",ssb_f_loo_summary_wd$Spearman_max)` para Spearman.
+
+
+```{r tab-assessment-parameters, results='asis'}
+latex_table_fit(
+  assessment_parameters,
+  caption="Parámetros estimados a partir de las 20 revisiones anuales de SS3 correspondientes a 2005--2024.",
+  label="tab:assessment-parameters",
+  digits=3
+)
+```
+
+La variación anual de las log-revisiones se presenta en la
+Figura \@ref(fig:fig-assessment-error-time).
+
+```{r fig-assessment-error-time, out.width="75%", fig.cap="Log-revisiones anuales de SSB, mortalidad por pesca y reclutamiento correspondientes a las actualizaciones 2005--2024. La línea discontinua representa un error igual a cero y la línea continua la media de las log-revisiones de cada variable."}
+knitr::include_graphics(file.path(fig_dir,"02_assessment_error_time_series.png"))
+```
+
+## Estructura temporal {#results-temporal}
+
+Los coeficientes de dependencia temporal de primer orden fueron
+\(\phi=`r sprintf("%.3f",assessment_temporal$phi[assessment_temporal$variable=="SSB"])`\)
+para SSB,
+\(\phi=`r sprintf("%.3f",assessment_temporal$phi[assessment_temporal$variable=="F"])`\)
+para \(F\) y
+\(\phi=`r sprintf("%.3f",assessment_temporal$phi[assessment_temporal$variable=="R"])`\)
+para reclutamiento. Los valores de \(p\) fueron
+`r sprintf("%.3f",assessment_temporal$p_value[assessment_temporal$variable=="SSB"])`,
+`r sprintf("%.3f",assessment_temporal$p_value[assessment_temporal$variable=="F"])` y
+`r sprintf("%.3f",assessment_temporal$p_value[assessment_temporal$variable=="R"])`,
+respectivamente (Tabla \@ref(tab:assessment-temporal)).
+
+Los coeficientes de dependencia temporal de primer orden fueron
+\(\phi=0.022\) para SSB, \(\phi=0.057\) para \(F\) y \(\phi=0.056\) para
+reclutamiento, con valores de \(p\) de 0.930, 0.817 y 0.825,
+respectivamente (Tabla \@ref(tab:assessment-temporal)). Con estos resultados,
+el modelo de referencia se implementó con \(\phi=0\) para las tres variables.
+La covariación contemporánea entre SSB, \(F\) y reclutamiento se mantuvo
+mediante la matriz de varianzas--covarianzas \(\boldsymbol{\Sigma}\).
+
+
+```{r tab-assessment-temporal, results='asis'}
+latex_table_fit(
+  assessment_temporal,
+  caption="Coeficientes de dependencia temporal de primer orden estimados para las revisiones anuales de SSB, mortalidad por pesca y reclutamiento.",
+  label="tab:assessment-temporal",
+  digits=3
+)
+```
+
+
+## Validación interna {#results-internal-validation}
+
+En las 10 000 realizaciones utilizadas para comprobar la implementación del
+emulador, las medias simuladas fueron
+`r sprintf("%.3f",emulator_validation$simulated_mean[emulator_validation$variable=="SSB"])`,
+`r sprintf("%.3f",emulator_validation$simulated_mean[emulator_validation$variable=="F"])`
+y
+`r sprintf("%.3f",emulator_validation$simulated_mean[emulator_validation$variable=="R"])`
+para SSB, \(F\) y reclutamiento, respectivamente. Los valores utilizados en
+la parametrización fueron
+`r sprintf("%.3f",emulator_validation$target_mean[emulator_validation$variable=="SSB"])`,
+`r sprintf("%.3f",emulator_validation$target_mean[emulator_validation$variable=="F"])`
+y
+`r sprintf("%.3f",emulator_validation$target_mean[emulator_validation$variable=="R"])`.
+
+Las desviaciones estándar simuladas fueron
+`r sprintf("%.3f",emulator_validation$simulated_sd[emulator_validation$variable=="SSB"])`,
+`r sprintf("%.3f",emulator_validation$simulated_sd[emulator_validation$variable=="F"])`
+y
+`r sprintf("%.3f",emulator_validation$simulated_sd[emulator_validation$variable=="R"])`,
+frente a valores de parametrización de
+`r sprintf("%.3f",emulator_validation$target_sd[emulator_validation$variable=="SSB"])`,
+`r sprintf("%.3f",emulator_validation$target_sd[emulator_validation$variable=="F"])`
+y
+`r sprintf("%.3f",emulator_validation$target_sd[emulator_validation$variable=="R"])`,
+respectivamente.
+
+Las correlaciones simuladas fueron
+`r sprintf("%.3f",emulator_cor_wd["SSB","F"])` para SSB--\(F\),
+`r sprintf("%.3f",emulator_cor_wd["SSB","R"])` para SSB--\(R\) y
+`r sprintf("%.3f",emulator_cor_wd["F","R"])` para \(F\)--\(R\). Los valores
+utilizados en la parametrización fueron
+`r sprintf("%.3f",assessment_par_rds$correlation["SSB","F"])`,
+`r sprintf("%.3f",assessment_par_rds$correlation["SSB","R"])` y
+`r sprintf("%.3f",assessment_par_rds$correlation["F","R"])`,
+respectivamente (Tabla \@ref(tab:emulator-validation)).
+
+```{r tab-emulator-validation, results='asis'}
+emulator_validation_display <- emulator_validation
+
+names(emulator_validation_display) <- c(
+  "Variable",
+  "Media objetivo",
+  "Media simulada",
+  "DE objetivo",
+  "DE simulada",
+  "Cor. objetivo con SSB",
+  "Cor. simulada con SSB"
+)
+
+latex_table_fit(
+  emulator_validation_display,
+  caption = "Comparación entre los parámetros utilizados por el emulador y los estadísticos calculados a partir de 10 000 realizaciones multivariantes.",
+  label = "tab:emulator-validation",
+  digits = 3
+)
+```
+
+Las distribuciones de log-error generadas por el emulador y las
+log-revisiones históricas utilizadas para su parametrización se presentan en
+la Figura \@ref(fig:fig-assessment-distribution).
+
+```{r fig-assessment-distribution, out.width="90%", fig.cap="Distribuciones de log-error generadas por el emulador y log-revisiones históricas utilizadas para su parametrización. Las curvas corresponden a las realizaciones simuladas y las marcas sobre el eje horizontal a las revisiones históricas."}
+knitr::include_graphics(file.path(fig_dir,"03_assessment_error_distribution_validation.png"))
+```
+
+Cinco secuencias generadas por el modelo de referencia se presentan en la
+Figura \@ref(fig:fig-assessment-examples). Estas secuencias se utilizaron
+únicamente como diagnóstico gráfico y no forman parte de las 1000
+realizaciones utilizadas en el MSE.
+
+```{r fig-assessment-examples, out.width="80%", fig.cap="Cinco secuencias de log-error generadas por el modelo de referencia. Las líneas negras corresponden a las revisiones históricas y las líneas de color a las realizaciones simuladas."}
+knitr::include_graphics(file.path(fig_dir,"04_example_assessment_error_trajectories.png"))
+```
+
+## Validación mediante retrospectivas convencionales {#results-external-validation}
+
+Los errores retrospectivos observados para los *peels* -1 a -5 se compararon
+con las distribuciones obtenidas a partir de 10 000 secuencias simuladas.
+Los 15 errores observados, correspondientes a cinco *peels* y tres variables,
+se situaron dentro de los percentiles 5 y 95 de las distribuciones simuladas
+(Tabla \@ref(tab:retrospective-validation)).
+
+Para SSB, los errores observados variaron entre -0.396 y 0.008; para \(F\),
+entre -0.007 y 0.574; y para reclutamiento, entre -0.304 y 0.363.
+
+```{r tab-retrospective-validation, results='asis'}
+retro_validation <- read.csv(
+  file.path(tab_dir, "04_retrospective_validation.csv")
+)
+
+retro_validation_display <- retro_validation
+
+names(retro_validation_display) <- c(
+  "Peel",
+  "Año",
+  "Variable",
+  "Observado",
+  "Mediana",
+  "p05",
+  "p95",
+  "Dentro 90%"
+)
+
+latex_table_fit(
+  retro_validation_display,
+  caption = "Error retrospectivo observado y distribución simulada para los peels -1 a -5.",
+  label = "tab:retrospective-validation",
+  digits = 3
+)
+```
+
+Mohn's rho observado fue -0.134 para SSB, 0.335 para \(F\) y 0.041 para
+reclutamiento. Los tres valores se situaron dentro de los percentiles 5 y 95
+de las distribuciones simuladas correspondientes
+(Tabla \@ref(tab:mohn-validation)).
+
+```{r tab-mohn-validation, results='asis'}
+mohn_validation <- read.csv(
+  file.path(tab_dir, "05_mohn_rho_validation.csv")
+)
+
+mohn_validation_display <- mohn_validation
+
+names(mohn_validation_display) <- c(
+  "Variable",
+  "Rho observado",
+  "Mediana",
+  "p05",
+  "p95",
+  "Dentro 90%"
+)
+
+latex_table_fit(
+  mohn_validation_display,
+  caption = "Mohn's rho observado y distribución obtenida a partir de 10 000 secuencias simuladas.",
+  label = "tab:mohn-validation",
+  digits = 3
+)
+```
+
+Cuatro de los cinco peels presentaron errores positivos para \(F\), tres
+para reclutamiento y uno para SSB. Las frecuencias de estos patrones en las
+10 000 secuencias simuladas fueron 0.281, 0.702 y 0.288, respectivamente
+(Tabla \@ref(tab:direction-validation)).
+
+```{r tab-direction-validation, results='asis'}
+direction_validation <- read.csv(
+  file.path(tab_dir, "06_directional_validation.csv")
+)
+
+direction_validation_display <- direction_validation
+
+names(direction_validation_display) <- c(
+  "Variable",
+  "Positivos",
+  "Negativos",
+  "Frecuencia"
+)
+
+latex_table_fit(
+  direction_validation_display,
+  caption = "Persistencia direccional de los errores retrospectivos y frecuencia correspondiente en las secuencias simuladas.",
+  label = "tab:direction-validation",
+  digits = 3
+)
+```
+
+Los errores acumulados por peel, Mohn's rho y la persistencia direccional
+se presentan conjuntamente en la Figura
+\@ref(fig:fig-external-validation).
+
+```{r fig-external-validation, out.width="95%", fig.cap="Validación mediante retrospectivas convencionales de SS3. (A) Error retrospectivo observado por peel y mediana y percentiles 5 y 95 de las simulaciones. (B) Mohn's rho observado y distribución simulada. (C) Persistencia direccional observada y frecuencia correspondiente bajo el proceso simulado."}
+knitr::include_graphics(
+  file.path(
+    fig_dir,
+    "05_assessment_error_external_validation.png"
+  )
+)
+```
+
+## Realizaciones utilizadas en el MSE {#results-mse-trajectories}
+
+Se generaron 1000 realizaciones multivariantes de *assessment error* para los
+años de evaluación 2024--2053. El objeto final contiene 30 años, 1000
+iteraciones y tres variables: SSB, \(F\) y reclutamiento.
+
+Los controles del objeto final confirmaron las dimensiones especificadas, la
+presencia de las tres variables y la ausencia de multiplicadores no finitos o
+menores o iguales a cero.
+
+El objeto se almacenó como
+
+`data/Rdata/assessment_error_reference_1000iter.rds`
+
+y constituye la entrada de *assessment error* utilizada posteriormente en las
+simulaciones *closed-loop* del MSE.
+
+# Reproducibilidad {#reproducibility}
+
+El componente de *assessment error* se genera mediante el script
+`14_build_assessment_error.R`. El script utiliza las retrospectivas móviles
+de SS3 con años terminales 2004--2024 para calcular las revisiones anuales y
+parametrizar el emulador. Las retrospectivas convencionales con *peels* de
+0 a -5 se utilizan para su validación.
+
+El script calcula las revisiones históricas de SSB, \(F\) y reclutamiento,
+estima los parámetros del modelo multivariante, realiza los diagnósticos de
+validación y genera las 1000 realizaciones de *assessment error* utilizadas
+posteriormente en el MSE.
+
+La secuencia computacional es:
+
+\[
+\begin{aligned}
+&\text{retrospectivas SS3} \\
+&\downarrow \\
+&\text{revisiones históricas} \\
+&\downarrow \\
+&\text{parametrización y validación del emulador} \\
+&\downarrow \\
+&\texttt{assessment\_error\_reference\_1000iter.rds}
+\end{aligned}
+\]
+
+El objeto final se almacena en
+`data/Rdata/assessment_error_reference_1000iter.rds`. Las tablas utilizadas
+en este WD se guardan en `outputs/assessment_error/tables/` y las figuras en
+`outputs/assessment_error/figures/`.
+
+El R Markdown no vuelve a ejecutar SS3 ni genera nuevamente las realizaciones
+de *assessment error*. Los resultados numéricos y las figuras se leen de los
+outputs generados por `14_build_assessment_error.R`, manteniendo la
+trazabilidad entre código, outputs y resultados reportados.
+
+
+# Conclusiones
+
+- Las revisiones históricas de SS3 mostraron diferencias en magnitud y dirección entre SSB, mortalidad por pesca y reclutamiento, con desviaciones estándar de 0.191, 0.284 y 0.310 en escala logarítmica, respectivamente.
+
+- Las revisiones de SSB y mortalidad por pesca presentaron una correlación negativa de -0.979, que se mantuvo en el análisis *leave-one-year-out*. Esta relación se incorporó en el emulador mediante la matriz de varianzas--covarianzas.
+
+- Los coeficientes de dependencia temporal de primer orden fueron próximos a cero para SSB, mortalidad por pesca y reclutamiento, sin evidencia estadística de dependencia temporal. El modelo de referencia se implementó con errores independientes entre años y mantuvo la dependencia entre variables dentro de cada año.
+
+- Las simulaciones del emulador reprodujeron las medias, desviaciones estándar y correlaciones utilizadas en su parametrización.
+
+- Los errores observados en las retrospectivas convencionales para los *peels* -1 a -5 y los valores de Mohn's rho se situaron dentro de los percentiles 5 y 95 de las distribuciones simuladas para las tres variables.
+
+- Los resultados permiten utilizar el emulador como representación del *assessment error* en el *shortcut MSE*. Las 1000 realizaciones generadas para 2024--2053 proporcionan los multiplicadores que se aplicarán posteriormente al estado percibido por la Management Procedure.
+
+# Referencias
+
+

@@ -1,0 +1,585 @@
+---
+title: "Condicionamiento de la pesquería y asignación estacional de las capturas para el shortcut MSE de ane.27.9aS"
+
+author:
+  - "María José Zúñiga"
+  - "Fernando Ramos"
+  - "María Ángeles Gamaza"
+
+date: "`r format(Sys.Date(), '%d-%m-%Y')`"
+
+output:
+  bookdown::pdf_document2:
+    toc: false
+    toc_depth: 3
+    number_sections: true
+    keep_tex: false
+
+bibliography: report_biblio.bib
+csl: ices-journal-of-marine-science.csl
+link-citations: true
+---
+
+**Working Document 03 — WKSPSIM 2026**
+
+**Stock:** Anchovy (*Engraulis encrasicolus*) in the southern part of Division 9.a  
+(Gulf of Cadiz and southern part of Portugal), ane.27.9aS
+
+**Affiliation:** Instituto Español de Oceanografía (IEO-CSIC), Centro Oceanográfico de Cádiz, Spain
+
+```{r setup, include=FALSE}
+library(knitr)
+library(here)
+library(dplyr)
+library(tidyr)
+library(readr)
+
+rds_dir <- here("data", "Rdata")
+ref_fig_dir <- here("outputs", "fishery_conditioning", "figures")
+ref_tab_dir <- here("outputs", "fishery_conditioning", "tables")
+sens_fig_dir <- here("outputs", "fishery_sensitivity", "figures")
+sens_tab_dir <- here("outputs", "fishery_sensitivity", "tables")
+
+required_csv <- function(path) {
+  if (!file.exists(path)) stop("Missing WD input: ", path)
+  read_csv(path, show_col_types = FALSE)
+}
+
+required_file <- function(path) {
+  if (!file.exists(path)) stop("Missing WD input: ", path)
+  path
+}
+
+seasonal_summary_file <- file.path(ref_tab_dir, "seasonal_catch_allocation_summary.csv")
+seasonal_check_file <- file.path(ref_tab_dir, "reference_seasonal_share_check_100OMs.csv")
+catch_age_file <- file.path(ref_tab_dir, "historical_catch_at_age_composition_by_quarter_table.csv")
+
+trend_file <- file.path(sens_tab_dir, "seasonal_catch_allocation_trend_results.csv")
+break_file <- file.path(sens_tab_dir, "seasonal_catch_allocation_breakpoints.csv")
+changepoint_file <- file.path(sens_tab_dir, "seasonal_catch_allocation_changepoints_meanvar.csv")
+pca_variance_file <- file.path(sens_tab_dir, "seasonal_catch_allocation_pca_variance.csv")
+cluster_file <- file.path(sens_tab_dir, "seasonal_catch_allocation_cluster_summary.csv")
+candidate_file <- file.path(sens_tab_dir, "candidate_seasonal_catch_allocation_scenarios.csv")
+
+catch_age_fig_file <- required_file(file.path(ref_fig_dir, "historical_catch_at_age_composition_by_quarter.png"))
+trend_fig_file <- required_file(file.path(sens_fig_dir, "seasonal_catch_allocation_trends.png"))
+cluster_fig_file <- required_file(file.path(sens_fig_dir, "seasonal_catch_allocation_cluster_means.png"))
+candidate_fig_file <- required_file(file.path(sens_fig_dir, "candidate_seasonal_catch_allocation_scenarios.png"))
+
+seasonal_summary <- required_csv(seasonal_summary_file)
+seasonal_check <- required_csv(seasonal_check_file)
+catch_age_table <- required_csv(catch_age_file)
+
+trend_results <- required_csv(trend_file)
+break_results <- required_csv(break_file)
+changepoint_results <- required_csv(changepoint_file)
+pca_variance <- required_csv(pca_variance_file)
+cluster_summary <- required_csv(cluster_file)
+candidate_scenarios <- required_csv(candidate_file)
+
+stopifnot(n_distinct(seasonal_check$om) == 100)
+stopifnot(n_distinct(seasonal_check$season) == 4)
+stopifnot(nrow(seasonal_check) == 400)
+stopifnot(all(candidate_scenarios$scenario %in% c("historical", "recent10", "recent3", "cluster_1", "cluster_2", "cluster_3")))
+stopifnot(all(abs(candidate_scenarios |> group_by(scenario) |> summarise(total = sum(prop), .groups = "drop") |> pull(total) - 1) < 1e-10))
+
+seasonal_share_max_diff <- max(seasonal_check$abs_diff, na.rm = TRUE)
+
+reference_share <- seasonal_check |>
+  group_by(season) |>
+  summarise(
+    mean_reference_share = mean(reference_share, na.rm = TRUE),
+    sd_reference_share = sd(reference_share, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+seasonal_summary_table <- seasonal_summary |>
+  select(season, mean_prop, sd_prop, p05_prop, p50_prop, p95_prop)
+
+trend_break_table <- trend_results |>
+  select(season, slope, p_value_slope, r_squared) |>
+  left_join(break_results |> select(season, n_breaks, break_years), by = "season") |>
+  left_join(changepoint_results |> select(season, n_changepoints, changepoint_years), by = "season")
+
+pc1_var <- pca_variance |>
+  filter(PC == "PC1") |>
+  pull(variance_explained)
+
+pc2_var <- pca_variance |>
+  filter(PC == "PC2") |>
+  pull(variance_explained)
+
+candidate_table <- candidate_scenarios |>
+  mutate(season = paste0("Q", season)) |>
+  select(scenario, season, prop) |>
+  pivot_wider(names_from = season, values_from = prop) |>
+  arrange(factor(scenario, levels = c("historical", "recent10", "recent3", "cluster_1", "cluster_2", "cluster_3")))
+
+fmt <- function(x, n = 3) formatC(as.numeric(x), format = "f", digits = n)
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = "center",
+  out.width = "90%"
+)
+```
+
+# Condicionamiento de la pesquería
+
+## Enfoque general
+
+El componente de pesquería del Operating Model (OM) se construyó a partir de
+las trayectorias condicionadas de ane.27.9aS descritas en WD01. La pesquería
+se representa en FLBEIA mediante una flota (`SEINE`), un métier (`ALL`) y un
+stock explotado (`ANE`) [@Garcia2017FLBEIA].
+
+Las variables históricas de la pesquería se transfirieron desde las
+realizaciones bootstrap de SS3, manteniendo la correspondencia entre la
+población y la pesquería de cada OM. El periodo histórico comprende
+1989--2024 y la proyección 2025--2054. Las 100 condiciones históricas se
+expandieron a 1.000 trayectorias, con 10 réplicas por OM.
+
+Para la proyección se parametrizaron la capturabilidad, las variables de
+flota y la asignación estacional de las capturas a partir de periodos
+históricos recientes. El esfuerzo, la mortalidad por pesca y las capturas
+realizadas durante la proyección se generan posteriormente dentro de las
+simulaciones de FLBEIA.
+
+La asignación estacional de referencia se definió a partir de las
+proporciones trimestrales de captura observadas durante 2015--2024. La
+variación histórica de estas proporciones se examinó para definir patrones
+alternativos utilizados posteriormente en el análisis de robustez.
+
+# Métodos {#methods}
+
+## Estructura histórica de la pesquería
+
+La pesquería histórica se mantiene asociada a cada una de las condiciones
+biológicas del OM. De este modo, las diferencias entre OMs no se limitan al
+estado y dinámica de la población, sino que cada OM conserva también la
+historia de capturas correspondiente a su reajuste bootstrap de SS3.
+
+Las 100 condiciones históricas se expandieron a 1.000 trayectorias,
+manteniendo la correspondencia entre cada trayectoria de proyección y su OM
+de origen. Los números y pesos a la edad de los desembarques y descartes se
+transfirieron al componente de pesquería de FLBEIA mediante un `FLCatchExt`,
+integrado en el métier `ALL` y la flota `SEINE`.
+
+En SS3, el peso a la edad utilizado para el stock y la captura es el mismo. Este supuesto se mantuvo durante la conversión a FLBEIA, comprobando para cada OM la correspondencia entre `landings.wt` y el peso a la edad del componente biológico (`wt`). Se utilizó una tolerancia de diferencia absoluta máxima de \(10^{-10}\).
+
+## Variables de flota y supuestos de proyección
+
+La pesquería proyectada mantiene la estructura de la flota condicionada
+históricamente, mientras que el esfuerzo y las capturas se determinan
+dinámicamente durante la simulación. El objeto de flota incluye los
+componentes `effort.share`, `vcost`, `effort`, `capacity`, `crewshare` y
+`fcost`.
+
+Para 2025--2054, `landings.wt`, `discards.wt`, `vcost`, `fcost` y
+`crewshare` se fijaron a partir de la media 2022--2024 específica de cada
+iteración. De este modo, las condiciones utilizadas durante la proyección
+conservan las diferencias entre OMs derivadas del condicionamiento histórico.
+
+En la configuración utilizada, `vcost` y `effort` se fijaron en 1,
+`capacity` en 5.000, y `crewshare` y `fcost` en 0. `effort.share` se mantuvo
+a partir del archivo de entrada. `alpha`, `beta`, `effort.share` y `capacity`
+se extendieron inicialmente a partir de los valores históricos. Durante la
+proyección, `beta` y `effort` se inicializaron en 1, mientras que
+`landings.n` y `discards.n` se inicializaron en 0.
+
+Estos valores definen las condiciones iniciales de la pesquería. El esfuerzo,
+la mortalidad por pesca y las capturas realizadas durante 2025--2054 se
+determinan posteriormente dentro de las simulaciones de FLBEIA.
+
+
+## Modelos de esfuerzo y captura
+
+Durante la proyección, la pesquería responde a la captura objetivo establecida
+por el procedimiento de gestión mediante un ajuste del esfuerzo pesquero. La
+relación entre esfuerzo y explotación del stock se representa mediante la
+capturabilidad (`catch.q`), mientras que la captura realizada se calcula a
+partir de la abundancia del stock y de las mortalidades natural y por pesca
+mediante la ecuación de captura de Baranov.
+
+En FLBEIA, esta dinámica se implementa utilizando `SMFB` como modelo de
+esfuerzo y `Baranov` como modelo de captura [@Garcia2017FLBEIA]. La
+restricción de esfuerzo se vincula al stock `ANE` y se especifica en términos
+de captura.
+
+La capturabilidad (`catch.q`) se calculó para cada OM utilizando el periodo
+2020--2024 y se mantuvo constante durante 2025--2054. Por tanto, las
+diferencias entre OMs en este componente se conservan durante la proyección.
+Los valores no finitos obtenidos durante el cálculo de `catch.q` se
+sustituyeron por cero.
+
+La capacidad de la flota se mantuvo constante mediante `fixedCapital`, con
+`capacity = 5000`. `catch.threshold` se fijó en 0.9 y `alpha` en 1.
+
+La captura se asignó a desembarques (`landings.sel = 1`) y no se modelaron
+descartes (`discards.sel = 0`). También se desactivó el mecanismo de descarte
+asociado a capturas por encima de la cuota (`discard.TAC.OS = FALSE`).
+
+## Asignación estacional de capturas de referencia
+
+El OM está estructurado en cuatro trimestres y, por tanto, la captura anual
+debe distribuirse entre las cuatro estaciones. Esta asignación determina en
+qué momento del año ocurre la explotación y su relación temporal con la
+dinámica de la población, incluido el desove en Q2 y la entrada del
+reclutamiento en Q3.
+
+La asignación estacional se expresa como la proporción de la captura anual
+que ocurre en cada trimestre. Para el OM \(i\), el año \(y\) y el trimestre
+\(s\), esta proporción se calcula como
+
+\[
+p_{iys} =
+\frac{C_{iys}}
+{\sum_{s=1}^{4} C_{iys}},
+\]
+
+donde \(C_{iys}\) es la biomasa capturada en el trimestre \(s\). Las cuatro
+proporciones suman uno para cada combinación de OM y año.
+
+Para la configuración de referencia, la asignación estacional de cada OM se
+definió como la media de las proporciones trimestrales observadas durante
+2015--2024:
+
+\[
+\bar{p}_{is}^{\,2015:2024}
+=
+\frac{1}{10}
+\sum_{y=2015}^{2024} p_{iys}.
+\]
+
+Las cuatro proporciones resultantes se mantuvieron durante 2025--2054 para
+el OM correspondiente. Por tanto, esta parametrización determina la
+distribución de la captura entre trimestres, pero no la magnitud de la
+captura anual, que se determina durante la simulación.
+
+Cada uno de los 100 OMs conserva su propia asignación estacional 2015--2024.
+Las diez réplicas derivadas de un mismo OM comparten estas proporciones. Para
+los diagnósticos históricos se utilizó una trayectoria representativa por
+OM, evitando tratar las réplicas como observaciones históricas independientes.
+
+La implementación se comprobó reconstruyendo las proporciones medias de
+2015--2024 a partir de las capturas históricas y comparándolas con los valores
+almacenados en `fleets.ctrl`. Se utilizó una tolerancia de diferencia absoluta
+máxima de \(10^{-10}\).
+
+## Captura histórica por edad y trimestre
+
+La composición por edad de la captura describe qué edades contribuyen a la
+explotación en cada trimestre y permite caracterizar su variación durante el
+periodo histórico.
+
+Para cada OM, año y trimestre, la captura a la edad se calculó como la suma
+de los números desembarcados y descartados. Posteriormente, los números
+capturados a cada edad se expresaron como proporción de la captura total del
+trimestre.
+
+Estas proporciones se utilizaron únicamente para describir la composición
+histórica por edad de la pesquería condicionada. No se utilizaron para fijar
+la composición de las capturas durante 2025--2054. Durante la proyección, la
+captura a la edad se determina dinámicamente a partir de la estructura de la
+población y de la explotación simulada en FLBEIA.
+
+## Diagnósticos de la variación temporal en la asignación estacional
+
+La distribución de las capturas entre trimestres puede variar a lo largo del
+tiempo, modificando el momento del año en que ocurre la explotación. Dado que
+la configuración de referencia utiliza la asignación media de 2015--2024, se
+examinó la serie histórica para caracterizar su variación temporal y determinar
+si existen patrones diferentes al utilizado en REF.
+
+Los diagnósticos se realizaron a partir de las proporciones trimestrales
+medias anuales de los 100 OMs históricos. Para cada trimestre se evaluó el
+cambio de la proporción de captura a lo largo del tiempo mediante una
+regresión lineal frente al año. También se examinaron cambios en la serie
+mediante `strucchange::breakpoints()` y `changepoint::cpt.meanvar()`, este
+último utilizando PELT con penalización MBIC.
+
+La distribución de la captura entre los cuatro trimestres también se analizó
+de forma conjunta. Se aplicó un análisis de componentes principales (PCA) a
+las proporciones trimestrales anuales centradas y escaladas para resumir los
+principales cambios en la asignación estacional. Posteriormente, se utilizó
+clustering jerárquico sobre las proporciones escaladas, con distancia
+euclídea y el método de Ward (`ward.D2`), para agrupar años con distribuciones
+estacionales similares.
+
+Se utilizaron tres grupos (\(k=3\)) para resumir patrones históricos
+contrastantes y definir configuraciones alternativas de asignación estacional.
+Estos grupos se utilizan como herramienta para caracterizar la variabilidad
+histórica y no se interpretan como tres regímenes discretos de la pesquería.
+
+Estos diagnósticos no modifican la configuración de referencia. Los patrones
+históricos identificados se utilizan posteriormente para definir
+configuraciones alternativas de asignación estacional en el análisis de
+sensibilidad/robustez.
+
+## Patrones estacionales para el análisis de robustez
+
+A partir de la variabilidad histórica se definieron patrones alternativos de
+distribución de la captura anual entre los cuatro trimestres. Estos patrones
+representan diferentes momentos de ocurrencia de la explotación dentro del
+año, sin modificar por sí mismos la magnitud de la captura anual.
+
+Los patrones se obtuvieron a partir de la media del periodo histórico
+completo, la media de 2015--2024, la media de 2022--2024 y las medias de los
+tres grupos identificados mediante clustering. Cada vector se normalizó para
+que las cuatro proporciones trimestrales sumaran uno.
+
+La configuración de referencia utiliza la media 2015--2024. Para el análisis
+de sensibilidad se seleccionaron además los patrones correspondientes a los
+clusters 1 y 2, denominados S-C1 y S-C2. Estos patrones mantienen la estructura
+histórica observada en cada grupo y permiten evaluar posteriormente el efecto
+de modificar la distribución temporal de la explotación dentro del año.
+
+WD03 documenta la construcción y el origen histórico de estos patrones. Su
+implementación y sus efectos sobre el desempeño del MSE se evalúan en WD08.
+
+
+# Resultados {#results}
+
+
+## Asignación estacional de referencia
+
+Las medias estacionales de 2015--2024 reconstruidas a partir de las capturas
+históricas coincidieron con los valores almacenados en el objeto de control
+de la flota de referencia. La diferencia absoluta máxima fue
+`r format(seasonal_share_max_diff, scientific = TRUE)`, frente al criterio
+de implementación de \(10^{-10}\).
+
+En los 100 OMs históricos, la asignación media de referencia fue
+`r paste0("Q", reference_share$season, " = ", sprintf("%.3f", reference_share$mean_reference_share), collapse = "; ")` (Tabla \@ref(tab:table-reference-seasonal-share) ).
+
+
+
+```{r table-reference-seasonal-share}
+kable(
+  reference_share,
+  digits = 3,
+  col.names = c("Quarter", "Mean reference share", "SD among OMs"),
+  caption = "Asignación estacional de capturas utilizada en la proyección de referencia. Los valores asignados a cada OM corresponden a su propia media de 2015--2024; la tabla resume estos valores específicos por OM para los 100 OMs históricos."
+)
+```
+
+## Variación histórica en la asignación estacional
+
+La distribución de la explotación entre trimestres varió durante 1989--2024.
+La Tabla \@ref(tab:table-seasonal-summary) resume las proporciones de captura
+observadas entre OMs y años y permite describir la magnitud de esta variación
+en cada trimestre.
+
+```{r table-seasonal-summary}
+kable(
+  seasonal_summary_table,
+  digits = 3,
+  col.names = c("Quarter", "Mean", "SD", "5%", "Median", "95%"),
+  caption = "Proporciones históricas de asignación estacional de capturas para los 100 OMs condicionados y los años 1989--2024."
+)
+```
+
+Los diagnósticos temporales permiten describir cómo cambió la contribución de
+cada trimestre a la captura anual durante el periodo histórico. La Tabla
+\@ref(tab:table-seasonal-temporal) presenta las tendencias lineales y los
+cambios identificados en las series trimestrales.
+
+Estos resultados caracterizan la variación histórica de la distribución
+temporal de la explotación. La configuración de referencia mantiene la media
+2015--2024 específica de cada OM.
+
+```{r table-seasonal-temporal}
+trend_break_display <- trend_break_table |>
+  mutate(
+    slope = round(slope, 5),
+    p_value_slope = signif(p_value_slope, 3),
+    r_squared = round(r_squared, 3)
+  ) |>
+  rename(
+    Quarter = season,
+    Slope = slope,
+    `p-value` = p_value_slope,
+    `R2` = r_squared,
+    Breaks = n_breaks,
+    `Break years` = break_years,
+    Changes = n_changepoints,
+    `Change years` = changepoint_years
+  )
+
+kable(
+  trend_break_display,
+  format = "latex",
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Diagnósticos temporales de la asignación estacional histórica de las capturas. Los diagnósticos caracterizan la serie histórica y no se utilizan para redefinir el OM de referencia."
+)
+```
+
+```{r fig-seasonal-trends, out.width="85%", fig.align="center", fig.cap="Proporciones anuales de asignación estacional de capturas y tendencias lineales específicas por trimestre durante 1989--2024. El diagnóstico se basa en las proporciones medias anuales de los 100 OMs condicionados."}
+knitr::include_graphics(trend_fig_file)
+```
+
+## Patrones estacionales multivariantes
+
+Los dos primeros componentes principales explicaron, respectivamente,
+`r sprintf("%.1f", 100 * pc1_var)`% y
+`r sprintf("%.1f", 100 * pc2_var)`% de la variación de las proporciones
+trimestrales escaladas, y
+`r sprintf("%.1f", 100 * (pc1_var + pc2_var))`% conjuntamente.
+
+El clustering jerárquico con \(k=3\) agrupó años con distribuciones
+trimestrales similares y produjo tres patrones medios de asignación
+estacional. Estos grupos resumen configuraciones históricas diferentes de la
+distribución temporal de la explotación y se utilizaron para construir los
+patrones del análisis de robustez. No se interpretan como tres regímenes
+cronológicos de la pesquería.
+
+```{r table-cluster-means}
+cluster_table <- cluster_summary |>
+  select(cluster, season, mean_prop) |>
+  mutate(season = paste0("Q", season)) |>
+  pivot_wider(names_from = season, values_from = mean_prop)
+
+kable(
+  cluster_table,
+  digits = 3,
+  caption = "Proporciones medias trimestrales de asignación de capturas para los tres clusters históricos diagnósticos."
+)
+```
+
+```{r fig-cluster-means, fig.cap="Proporciones medias trimestrales de asignación de capturas para los tres grupos históricos. Los grupos se utilizan para construir patrones alternativos de asignación estacional y no modifican el OM de referencia."}
+knitr::include_graphics(cluster_fig_file)
+```
+
+## Patrones estacionales para el análisis de robustez
+
+A partir de los diagnósticos históricos se obtuvieron seis patrones de
+asignación estacional: la media de 1989--2024, la media de 2015--2024, la
+media de 2022--2024 y las medias de los tres grupos identificados mediante
+clustering.
+
+Cada patrón representa una distribución diferente de la captura anual entre
+Q1--Q4. La configuración de referencia conserva las medias 2015--2024
+específicas de cada OM. Por tanto, el patrón agregado `recent10` se utiliza
+únicamente como resumen de este periodo y no sustituye las proporciones
+específicas por OM utilizadas en REF.
+
+Los patrones correspondientes a los clusters 1 y 2 se utilizan posteriormente
+como S-C1 y S-C2 en el análisis de robustez documentado en WD08.
+
+```{r table-candidate-seasonal-patterns}
+kable(
+  candidate_table,
+  digits = 3,
+  col.names = c("Scenario", "Q1", "Q2", "Q3", "Q4"),
+  caption = "Patrones candidatos de asignación estacional de capturas generados a partir de los diagnósticos históricos. El OM de referencia conserva medias 2015--2024 específicas de cada OM en lugar de sustituirlas por el único vector agregado recent10 mostrado aquí."
+)
+```
+
+```{r fig-candidate-seasonal-patterns, out.width="85%", fig.align="center", fig.cap="Patrones candidatos de asignación estacional de capturas generados a partir de los diagnósticos históricos. Estos patrones definen posibles escenarios de sensibilidad; sus efectos sobre el desempeño del MSE se evaluarán posteriormente."}
+knitr::include_graphics(candidate_fig_file)
+```
+
+
+
+## Captura histórica por edad y trimestre
+
+La composición por edad de la captura difirió entre trimestres durante el
+periodo histórico. La Tabla \@ref(tab:table-catch-age) resume la contribución
+media de cada edad a la captura trimestral de los OMs condicionados.
+
+Estas proporciones describen la estructura por edad de la explotación
+histórica. No se utilizan como una composición fija durante la proyección,
+en la que la captura a la edad se determina a partir de la población
+disponible y de la explotación simulada en FLBEIA.
+
+```{r table-catch-age}
+catch_age_display <- catch_age_table
+names(catch_age_display) <- sub("Age_3$", "Age_3plus", names(catch_age_display))
+
+kable(
+  catch_age_display,
+  digits = 3,
+  caption = "Composición media histórica de la captura por edad y trimestre entre los OMs condicionados y los años históricos. La edad 3 representa el grupo 3+."
+)
+```
+
+```{r fig-catch-age, out.width="80%", fig.align="center", fig.cap="Composición media histórica de la captura por edad y trimestre entre los OMs condicionados. La captura por edad es un diagnóstico histórico; la captura futura realizada por edad se genera dinámicamente durante las simulaciones de FLBEIA."}
+knitr::include_graphics(catch_age_fig_file)
+```
+
+
+# Reproducibilidad
+
+La pesquería de referencia se construye mediante `10_built_fleet_Reference.R` después de generar los objetos del OM biológico y del condicionamiento del reclutamiento. El script lee los objetos biológicos y de stock condicionados, el mapa de 1000 iteraciones y los archivos CSV de variables de la flota SEINE. Como salida genera:
+
+- `data/Rdata/ane_stock_conditioned_1000iter.rds`;
+- `data/Rdata/fleets_conditioned_1000iter.rds`;
+- `data/Rdata/fleets_ctrl_reference_1000iter.rds`.
+
+Posteriormente, `11_seasonal_catch_allocation_diagnostics.R` lee el stock condicionado, la flota, los controles de flota y el mapa de iteraciones. Los outputs de documentación de la referencia se guardan en `outputs/fishery_conditioning/`, mientras que los diagnósticos temporales, PCA, clustering y escenarios candidatos se almacenan por separado en `outputs/fishery_sensitivity/`.
+
+Las principales configuraciones de referencia se resumen en la Tabla \@ref(tab:table-reference-settings).
+
+```{r table-reference-settings}
+reference_settings <- tibble::tribble(
+  ~Component, ~Reference_setting,
+  "Historical period", "1989-2024",
+  "Projection period", "2025-2054",
+  "Fleet / metier / stock", "SEINE / ALL / ANE",
+  "Historical OM conditions", "100",
+  "Projection trajectories", "1000 (10 per historical OM)",
+  "Effort model", "SMFB",
+  "Catch model", "Baranov",
+  "Effort restriction", "catch (ANE)",
+  "Capital model", "fixedCapital",
+  "Catch threshold", "0.9",
+  "Catchability averaging period", "2020-2024",
+  "Projection weight/fleet averaging period", "2022-2024",
+  "Reference seasonal-share averaging period", "2015-2024, OM-specific",
+  "landings.sel", "1",
+"discards.sel", "0",
+"discard.TAC.OS", "FALSE",
+  "Future landings.n / discards.n", "initialised at 0",
+  "Future beta / effort", "initialised at 1",
+  "Future realised catch-at-age", "generated dynamically during simulation"
+)
+
+kable(
+  reference_settings,
+  caption = "Principales configuraciones utilizadas para construir el componente de pesquería de referencia del OM."
+)
+```
+
+# Conclusiones
+
+- La pesquería se incorporó al OM manteniendo la correspondencia entre cada
+  condición biológica y la historia de la pesquería derivada del mismo
+  reajuste bootstrap de SS3. Durante la proyección, el esfuerzo, la mortalidad
+  por pesca y las capturas se generan dinámicamente en FLBEIA.
+
+- La configuración de referencia distribuye la mayor parte de la captura anual
+  entre Q2 y Q3, que conjuntamente representan aproximadamente el 75% de la
+  captura. Este patrón reciente presenta poca variación entre los 100 OMs y se
+  mantiene durante 2025--2054 de forma específica para cada OM.
+
+- La asignación estacional no fue constante durante 1989--2024. Los principales
+  cambios se observaron en Q1 y Q3, con una disminución de la contribución de
+  Q1 y un aumento de Q3. Los análisis multivariantes identificaron patrones
+  históricos diferentes en la distribución de la captura entre trimestres.
+
+- La composición por edad de la captura también presenta una estructura
+  estacional. Las capturas de Q1 y Q2 están dominadas por individuos de edad 1,
+  mientras que la contribución de edad 0 aumenta en Q3 y constituye la mayor
+  proporción de la captura en Q4. Esta composición histórica no se impone
+  durante la proyección.
+
+- La variabilidad histórica de la asignación estacional se utilizó para definir
+  patrones alternativos de explotación. Los patrones correspondientes a los
+  clusters 1 y 2 se seleccionaron como S-C1 y S-C2 para evaluar posteriormente
+  la sensibilidad del MSE a cambios en la distribución temporal de la
+  explotación dentro del año.
+
+# Referencias

@@ -4,7 +4,6 @@
 .Ruserdata
 Fcap_Besc_grid_results
 Fcap_Besc_grid_results.tar.gz
-
 # Full simulation runs retained locally
 /data/mse/MP_runs/
 /data/mse/robustness_runs/
@@ -15,7 +14,6 @@ data/Rdata/fleets_conditioned_1000iter.rds
 data/Rdata/fleets_ctrl_reference_1000iter.rds
 data/Rdata/iteration_map_1000.csv
 data/Rdata/SRs_reference_conditioned_1000iter.rds
-
 # Stochastic recruitment realizations
 data/Rdata/recruitment_deviations_om_specific_1000iter.rds
 data/Rdata/recruitment_deviations_reference_1000iter.rds
@@ -24,17 +22,21 @@ data/Rdata/recruitment_multipliers_reference_1000iter.rds
 data/Rdata/recruitment_standard_normal_deviates_1000iter.rds
 data/Rdata/SRs_om_specific_1000iter_process_error.rds
 data/Rdata/SRs_reference_1000iter_process_error.rds
-
 # Simulated assessment-error realizations
 data/Rdata/assessment_error_reference_1000iter.rds
 data/Rdata/assessment_error_simulated_reference.rds
-
 # Detailed MSE performance objects
 data/mse/performance_refined/refined_candidate_MP_performance.rds
 data/mse/performance_refined/refined_candidate_MP_trajectory_metrics.csv
-
 # Detailed robustness performance objects
 data/mse/robustness_performance/*/robustness_MP_performance.rds
 data/mse/robustness_performance/*/robustness_MP_trajectory_metrics.csv
+README_ES.md
+# Report compilation and temporary files
+report/WD/*.log
+report/WD/report_biblio_borrar.bib
+
+# Previous and temporary WD versions
+report/WD/previos_borrar/
 
 

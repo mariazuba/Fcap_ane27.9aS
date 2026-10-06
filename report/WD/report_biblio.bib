@@ -1,0 +1,723 @@
+@report{WGHANSA2015,
+  author = {{ICES}},
+  title = {Report of the Working Group on Southern Horse Mackerel, Anchovy and Sardine (WGHANSA), 24--29 June 2015, Lisbon, Portugal},
+  year = {2015},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES CM},
+  number = {2015/ACOM:16},
+  pages = {612}
+}
+
+@report{WGACEGG2021,
+  author = {{ICES}},
+  title = {Working Group on Acoustic and Egg Surveys for Small Pelagic Fish in the Northeast Atlantic (WGACEGG)},
+  year = {2021},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Scientific Reports}
+}
+
+@misc{STECF2013,
+	Author = {STECF},
+	howpublished = {Publications Office of the European Union, Luxembourg, 2013, ISBN 978-92-79-34619-4 },
+	Title = {Advice on the Harvest Control Rule and Evaluation of the Anchovy Plan COM(2009) 399 Final (EWG 13-20)},
+	Year = {2013},
+	note={doi:10.2788/35653}
+}
+
+@misc{STECF2014,
+	Author = {STECF},
+	howpublished = {Publications Office of the European Union, Luxembourg, 2014, ISBN 978-92-79-37843-0},
+	Title = {Evaluation /Scoping of Management plans - Data analysis for support of the impact assessment for the management plan of Bay of Biscay anchovy (COM(2009)399 final) (EWG 14-03)},
+	Year = {2014},
+	note={doi:10.2788/57391}
+}
+
+@article{Methot2013,
+   abstract = {Stock synthesis (SS) is a statistical age-structured population modeling framework that has been applied in a wide variety of fish assessments globally. The framework is highly scalable from data-weak situations where it operates as an age-structured production model, to complex situations where it can flexibly incorporate multiple data sources and account for biological and environmental processes. SS implements compensatory population dynamics through use of a function relating mean recruitment to spawner reproductive output. This function enhances the ability of SS to operate in data-weak situations and enables it to estimate fishery management quantities such as fishing rates that would provide for maximum sustainable yield and to employ these rates in forecasts of potential yield and future stock status. Complex model configurations such as multiple areas and multiple growth morphs are possible, tag-recapture data can be used to aid estimation of movement rates among areas, and most parameters can change over time in response to environmental and ecosystem factors. SS is coded using Auto-Differentiation Model Builder, so inherits its powerful capability to efficiently estimate hundreds of parameters using either maximum likelihood or Bayesian inference. Output processing, principally through a package developed in R, enables rapid model diagnosis. Details of the underlying population dynamics and the statistical framework used within SS are provided. © 2012.},
+   author = {Richard D. Methot and C. R. Wetzel},
+   doi = {10.1016/J.FISHRES.2012.10.012},
+   issn = {0165-7836},
+   journal = {Fisheries Research},
+   keywords = {Fishery management,Population models,Stock assessment,Stock synthesis},
+   month = {5},
+   pages = {86-99},
+   title = {Stock synthesis: A biological and statistical framework for fish stock assessment and fishery management},
+   volume = {142},
+   url = {https://doi.org/10.1016/j.fishres.2012.10.012},
+   year = {2013},
+}
+
+@manual{Methot2024,
+  author = {Methot, Richard D. and Wetzel, Chantel R. and Taylor, Ian G. and Doering, Kathryn and Perl, Elizabeth and Johnson, Kelli F.},
+  title = {Stock Synthesis User Manual: Version 3.30.22.1},
+  year = {2024},
+  url = {https://github.com/nmfs-ost/ss3-source-code/releases}
+}
+
+@article{Taylor2021,
+   abstract = {Stock assessment analysts are exploring an increasingly diverse and complex range of models while also facing higher expectations for consistency, documentation, and transparency in reports and management advice, all within a tight timeline. Meeting these goals requires increased efficiency at all steps in the assessment process from data processing, through model development and selection, to report writing and review. Here, we describe one widely used tool that has proven successful in increasing the efficiency of the assessment process: the r4ss package, which supports the use of the Stock Synthesis modeling framework. What began 15 years ago as a tool to provide simple model diagnostics, including plots showing data and model results, has grown into a large collection of R functions to support many aspects of the assessment process. We provide an overview of the r4ss features and illustrate its utility with examples from recent applications. Finally, we discuss lessons learned from the ongoing development of r4ss that can be applied to similar efforts associated with the next generation of stock assessment packages.},
+   author = {Ian G. Taylor and Kathryn L. Doering and Kelli F. Johnson and Chantel R. Wetzel and Ian J. Stewart},
+   doi = {10.1016/J.FISHRES.2021.105924},
+   issn = {0165-7836},
+   journal = {Fisheries Research},
+   keywords = {Conditional age-at-length data,Model diagnostics,R packages,Stock Synthesis,r4ss},
+   month = {7},
+   pages = {105924},
+   title = {Beyond visualizing catch-at-age models: Lessons learned from the r4ss package about software to support stock assessments},
+   volume = {239},
+   url = {https://doi.org/10.1016/j.fishres.2021.105924},
+   year = {2021},
+}
+
+@article{Carvalho2021,
+title = {A cookbook for using model diagnostics in integrated stock assessments},
+journal = {Fisheries Research},
+volume = {240},
+pages = {105959},
+year = {2021},
+issn = {0165-7836},
+doi = {10.1016/j.fishres.2021.105959},
+url = {https://www.sciencedirect.com/science/article/pii/S0165783621000874},
+author = {Felipe Carvalho and Henning Winker and Dean Courtney and Maia Kapur and Laurence Kell and Massimiliano Cardinale and Michael Schirripa and Toshihide Kitakado and Dawit Yemane and Kevin R. Piner and Mark N. Maunder and Ian Taylor and Chantel R. Wetzel and Kathryn Doering and Kelli F. Johnson and Richard D. Methot},
+keywords = {Stock Synthesis, Model development, Hindcast, Profiling, Convergence, ASPM},
+abstract = {Integrated analysis has increasingly been the preferred approach for conducting stock assessments and providing the basis for management advice for fish and invertebrate stocks around the world. Many decisions are required when developing integrated stock assessments. For example, the analyst needs to decide whether the model fits the data, if the optimization was successful, if estimates are consistent retrospectively, and if the model is suitable to predict future stock responses to fishing. This study provides practical guidelines for implementing selected diagnostic tools that can assist analysts in identifying problems with model specifications and alternatives that can be explored to minimize or eliminate such problems. Emphasis is placed on reviewing the implementation and interpretation of contemporary model diagnostic tools. We first describe each diagnostic approach and its utility. We then proceed by providing a “cookbook recipe” on how to implement each of the diagnostics, together with an interpretation of the results, using two worked examples of integrated stock assessments with Stock Synthesis. Further, we provide a conceptual flow chart that lays out a generic process of model development and selection using the presented model diagnostics. Based on this, we propose the following four properties as objective criteria for evaluating the plausibility of a model: (1) model convergence, (2) fit to the data, (3) model consistency, and (4) prediction skill. It would greatly benefit the stock assessment community if the next generation of stock assessment models could include the diagnostic tests presented in this study as a set of open source tools.}
+}
+
+@article{Francis2011,
+author = {Francis, R.I.C. Chris},
+title = {Data weighting in statistical fisheries stock assessment models},
+journal = {Canadian Journal of Fisheries and Aquatic Sciences},
+volume = {68},
+number = {6},
+pages = {1124-1138},
+year = {2011},
+doi = {10.1139/f2011-025},
+url = { https://doi.org/10.1139/f2011-025},
+eprint = {https://doi.org/10.1139/f2011-025},
+abstract = { The conclusions drawn from fisheries stock assessment models can depend strongly on the relative weights assigned to different data sets. However, there is no consensus amongst practitioners as to the best approach to data weighting. From a discussion of some key questions concerning data weighting in stock assessment models, I draw three guiding principles: (i) do not let other data stop the model from fitting abundance data well; (ii) when weighting age or length composition data, allow for correlations; and (iii) do not down-weight abundance data because they may be unrepresentative. I propose an approach to data weighting based on these principles. Two factors that complicate this approach are that some decisions are inevitably subjective (which underlines the need for expert knowledge in stock assessment), and some technical problems are unresolved. }
+}
+
+@book{Pinheiro2002,
+   title={Mixed-Effects Models in S and S-PLUS},
+   author={José C. Pinheiro and Douglas M. Bates},
+   year={2002},
+   publisher={Springer New York},
+   series={Statistics and Computing},
+   isbn={978-0-387-98957-0},
+   doi={10.1007/b98882}
+}
+
+@article{Lindstrom1990,
+   author={Lindstrom, M.J. and Bates, D.M.},
+   title={Nonlinear Mixed Effects Models for Repeated Measures Data},
+   journal={Biometrics},
+   volume={46},
+   pages={673-687},
+   year={1990},
+}
+
+@techreport{Taylor2014,
+  author = {Taylor, Nathan and Hicks, Allan and Taylor, Ian and Grandin, Chris and Cox, Sean},
+  title = {Status of the Pacific Hake (Whiting) Stock in U.S. and Canadian Waters in 2014 with a Management Strategy Evaluation},
+  year = {2014},
+  institution = {International Pacific Hake Joint Technical Committee}
+}
+
+@article{Kuriyama2016,
+title = {An empirical weight-at-age approach reduces estimation bias compared to modeling parametric growth in integrated, statistical stock assessment models when growth is time varying},
+journal = {Fisheries Research},
+volume = {180},
+pages = {119-127},
+year = {2016},
+note = {Growth: theory, estimation, and application in fishery stock assessment models},
+issn = {0165-7836},
+doi = {10.1016/j.fishres.2015.09.007},
+url = {https://www.sciencedirect.com/science/article/pii/S0165783615300837},
+author = {Peter T. Kuriyama and Kotaro Ono and Felipe Hurtado-Ferro and Allan C. Hicks and Ian G. Taylor and Roberto R. Licandeo and Kelli F. Johnson and Sean C. Anderson and Cole C. Monnahan and Merrill B. Rudd and Christine C. Stawitz and Juan L. Valero},
+keywords = {Empirical weight-at-age information, Fisheries stock assessment, Time-varying growth, ss3sim, Stock Synthesis},
+abstract = {Somatic growth in fishes often varies through time. Despite this, most stock assessments either fix or estimate a time-invariant growth relationship because estimating time-varying growth parameters can be data intensive and subject to multiple sources of bias. Additionally, estimates of growth are often confounded with estimates of selectivity, particularly if selectivity is also time varying. Incorporating empirical weight-at-age (EWAA) information into assessments is a little-studied alternative that accounts for time-varying growth, but foregoes fixing or estimating growth and length–weight relationships. However, this method requires annual measures of fish weights at each age, and missing values must therefore be interpolated. We used Stock Synthesis in a simulation-testing framework to compare the effect of estimating a single time-invariant growth curve, time-varying growth curves, and incorporating EWAA information on management quantities and parameter estimates. We ran simulations across two fish life histories (hake-like and rockfish-like) and three data cases (data-rich, data-rich with a late-starting survey, and data-moderate). We found that when growth was time invariant, the EWAA approach was unbiased but had twice the median average relative error compared to a model that estimated growth from age and length data. However, for data-rich cases with time-varying growth, the EWAA method resulted in more accurate estimates of spawning stock biomass compared to the approach that estimated time-invariant and time-varying growth parameters, as evidenced by at least a five-fold reduction in range of median relative errors. The magnitude of this effect was greatest for the long-lived, slow-growing life history. For the relatively fast-growing species, estimates from the EWAA method were particularly sensitive to interpolating missing values.}
+}
+
+@article{Pinheiro1996,
+   author={Pinheiro, J.C. and Bates, D.M.},
+   title={Unconstrained Parametrizations for Variance-Covariance Matrices},
+   journal={Statistics and Computing},
+   volume={6},
+   pages={289-296},
+   year={1996},
+}
+
+@article{Hsu2024,
+    author = {Hsu, Jhen and Chang, Yi-Jay and Brodziak, Jon and Kai, Mikihiko and Punt, André E},
+    title = "{On the probable distribution of stock-recruitment resilience of Pacific saury (Cololabis saira) in the Northwest Pacific Ocean}",
+    journal = {ICES Journal of Marine Science},
+    volume = {81},
+    number = {4},
+    pages = {748-759},
+    year = {2024},
+    month = {04},
+    abstract = "{Determining how resilient a stock-recruitment relationship is to environmental variation is crucial for fisheries management. Steepness is a key factor characterizing the resilience of a fish stock and, hence, for establishing management reference points. This study estimates the distribution of steepness for Pacific saury using a simulation approach based on evolutionary ecology and reproductive biology, and how it changes in response to environmental change. The median estimated steepness is 0.82 (80\% probable range 0.59, 0.93) based on the best available biological information, which suggests that Pacific saury can produce a relatively high proportion of unfished recruitment when depleted to 20\% of unfished spawning biomass. Elasticity analysis indicates that steepness for Pacific saury is most sensitive to the survival rate of early life stages, mean body weight, growth, and length-at-maturity. Environmental change could substantially impact steepness, with unfavorable conditions related to survival rates, length-at-maturity, mean body weight, and growth potentially leading to a reduction in resilience. Understanding these impacts is crucial for the assessment and management of Pacific saury. Our numerical simulation approach provides an analytical tool applicable for calculating the steepness distribution in other small pelagic fish influenced by increases in sea surface temperature due to global warming.}",
+    issn = {1054-3139},
+    doi = {10.1093/icesjms/fsae030},
+    url = {https://doi.org/10.1093/icesjms/fsae030},
+    eprint = {https://academic.oup.com/icesjms/article-pdf/81/4/748/57945692/fsae030.pdf},
+}
+
+@article{Wiff2018,
+title = {Estimating steepness of the stock-recruitment relationship in Chilean fish stocks using meta-analysis},
+journal = {Fisheries Research},
+volume = {200},
+pages = {61-67},
+year = {2018},
+issn = {0165-7836},
+doi = {10.1016/j.fishres.2017.12.004},
+url = {https://www.sciencedirect.com/science/article/pii/S0165783617303399},
+author = {Rodrigo Wiff and Andrés Flores and Sergio Neira and Bruno Caneco},
+keywords = {Stock-recruitment, Meta-analysis, Steepness, Chilean fisheries},
+abstract = {Steepness (h) is a fundamental metric in population dynamics because it defines the relationship between parental stock and offspring. h represents a direct measurement of resilience and is therefore crucial in the management of harvested populations. However, h represents one of the most difficult parameters to estimate, even for data-rich stocks. It is usually estimated using indirect methods based on meta-analysis. Existing meta-analyses use all available estimates of h from different sources of information (i.e., from outside or within the stock assessment model) and report non-significant relationships between h and other life history traits, even though several theoretical analyses suggest the contrary. We conducted a two-stage meta-analysis, firstly selecting suitable h estimates from stock assessment models for fish stocks worldwide. 42 estimates of h were collected and several life history attributes were used as explanatory variables within generalised linear models (GLMs). We found a significant relationship (p < 0.05) between h and the ratio between length at 50% maturity (L50) and asymptotic length (L∞). The second stage of our meta-analysis was to apply this relationship to 19 fish stocks harvested off Chile to estimate species-specific h and the associated uncertainty. We discuss the assumptions of the proposed meta-analysis, the reliability of the estimated uncertainties and outline the potential application in the assessment and management of fish resources in Chile.}
+}
+
+@article{Methot2011,
+author = {Methot, Richard D. and Taylor, Ian G.},
+title = {Adjusting for bias due to variability of estimated recruitments in fishery assessment models},
+journal = {Canadian Journal of Fisheries and Aquatic Sciences},
+volume = {68},
+number = {10},
+pages = {1744-1760},
+year = {2011},
+doi = {10.1139/f2011-092},
+
+url = { 
+    
+        https://doi.org/10.1139/f2011-092
+    
+    
+
+},
+eprint = { 
+    
+        https://doi.org/10.1139/f2011-092
+    
+    
+
+}
+,
+    abstract = { Integrated analysis models provide a tool to estimate fish abundance, recruitment, and fishing mortality from a wide variety of data. The flexibility of integrated analysis models allows them to be applied over extended time periods spanning historical decades with little information from which to estimate the annual signal of recruitment variability to modern periods in which more information about recruitment variability exists. Across this range of data availability, the estimation process must assure that the estimated log-normally distributed recruitments are mean unbiased to assure mean unbiased biomass estimates. Here we show how the estimation method implemented in the integrated analysis model, Stock Synthesis, achieves this unbiased characteristic in a penalized likelihood approach that is comparable to the results from Markov chain Monte Carlo. The total variability in recruitment is decomposed into variability among annual recruitment estimates based on information in the data and a residual variability. Because data are never perfectly informative, we show that estimated recruitment variability will always be less than the true variability among recruitments and that the method implemented here can be used to iteratively estimate the true variability among recruitments. }
+}
+
+@inproceedings{Winker2019,
+  author = {Winker, Henning and Walter, John and Cardinale, Massimiliano and Fu, Dan},
+  title = {A Multivariate Lognormal Monte-Carlo Approach for Estimating Structural Uncertainty about the Stock Status and Future Projections for Indian Ocean Yellowfin Tuna},
+  year = {2019}
+}
+
+@article{Thorson2020,
+author = {Thorson, James T.},
+title = {Predicting recruitment density dependence and intrinsic growth rate for all fishes worldwide using a data-integrated life-history model},
+journal = {Fish and Fisheries},
+volume = {21},
+number = {2},
+pages = {237-251},
+keywords = {life-history theory, meta-analysis, recruitment, Steepness, stock assessment, taxonomy},
+doi = {10.1111/faf.12427},
+url = {https://onlinelibrary.wiley.com/doi/abs/10.1111/faf.12427},
+eprint = {https://onlinelibrary.wiley.com/doi/pdf/10.1111/faf.12427},
+abstract = {Abstract Fisheries scientists use biological models to determine sustainable fishing rates and forecast future dynamics. These models require both life-history parameters (mortality, maturity, growth) and stock-recruit parameters (juvenile production). However, there has been little research to simultaneously predict life-history and stock-recruit parameters. I develop the first data-integrated life-history model, which extends a simple model of evolutionary dynamics to field measurements of life-history parameters as well as historical records of spawning output and subsequent recruitment. This evolutionary model predicts recruitment productivity (steepness) and variability (variance and autocorrelation in recruitment deviations) as well as mortality, maturity, growth, and size, and uses these to predict intrinsic growth rate (r) for all described fishes. The model confirms previous analysis showing little correlation between steepness and either natural mortality or asymptotic maximum size (). However, it does reveal taxonomic patterns, where family Sebastidae has lower steepness () and Salmonidae has elevated steepness () relative to the prediction for bony fishes (class Actinopterygii, ). Similarly, genus Sebastes has growth rate (0.09) approaching that of several shark families (Lamniformes: 0.02; Carcharhiniformes: 0.02). A cross-validation experiment confirms that the model is accurate, explains a substantial portion of variance (32\%–67\%), but generates standard errors that are somewhat too small. Predictive intervals are tighter for species than for higher-level organizations (e.g. families), and predictions (including intervals) are available for all fishes worldwide in R package FishLife. I conclude by outlining how multivariate predictions of life-history and stock-recruit parameters could be useful for stock assessment, decision theory, ensemble modelling and strategic management.},
+year = {2020}
+}
+
+@article{Punt2016,
+  author = {Punt, André E. and Butterworth, Doug S. and de Moor, Carryn L. and De Oliveira, José A. A. and Haddon, Malcolm},
+  title = {Management strategy evaluation: best practices},
+  journal = {Fish and Fisheries},
+  year = {2016},
+  volume = {17},
+  number = {2},
+  pages = {303--334}
+}
+
+@article{Mohn1999,
+  author = {Mohn, Robert},
+  title = {The retrospective problem in sequential population analysis: An investigation using cod fishery and simulated data},
+  journal = {ICES Journal of Marine Science},
+  year = {1999},
+  volume = {56},
+  number = {4},
+  pages = {473--488}
+}
+
+@article{HurtadoFerro2015,
+  author = {Hurtado-Ferro, Felipe and Szuwalski, Cody S. and Valero, Juan L. and Anderson, Sean C. and Cunningham, Curry J. and Johnson, Kelli F. and Licandeo, Roberto and McGilliard, Carey R. and Monnahan, Cole C. and Muradian, Melissa L. and Ono, Kotaro and Vert-Pre, Katy A. and Whitten, Athol R. and Punt, André E.},
+  title = {Looking in the rear-view mirror: bias and retrospective patterns in integrated, age-structured stock assessment models},
+  journal = {ICES Journal of Marine Science},
+  year = {2015},
+  volume = {72},
+  number = {1},
+  pages = {99--110}
+}
+
+@article{Wiedenmann2015,
+  author = {Wiedenmann, John and Wilberg, Michael J. and Sylvia, Andrew and Miller, Thomas J.},
+  title = {Autocorrelated error in stock assessment estimates: Implications for management strategy evaluation},
+  journal = {Fisheries Research},
+  year = {2015},
+  volume = {172},
+  pages = {325--334}
+}
+
+@report{ICES2024WKBANSP,
+  author = {{ICES}},
+  title = {Benchmark Workshop for anchovy stocks (WKBANSP)},
+  year = {2024},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Scientific Reports},
+  volume = {6},
+  number = {96},
+  pages = {511},
+  doi = {10.17895/ices.pub.27909783},
+  url = {https://doi.org/10.17895/ices.pub.27909783}
+}
+
+@report{ICES2025StockAnnex9aS,
+  author = {{ICES}},
+  title = {Anchovy ({Engraulis encrasicolus}) in the southern part of Division 9.a (Gulf of Cadiz and southern part of Portugal)},
+  year = {2025},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Stock Annexes},
+  pages = {55},
+  doi = {10.17895/ices.pub.28053362},
+  url = {https://doi.org/10.17895/ices.pub.28053362}
+}
+
+@article{Bates2015,
+  author = {Bates, Douglas and M{\"a}chler, Martin and Bolker, Ben and Walker, Steve},
+  title = {Fitting Linear Mixed-Effects Models Using {lme4}},
+  journal = {Journal of Statistical Software},
+  year = {2015},
+  volume = {67},
+  number = {1},
+  pages = {1--48},
+  doi = {10.18637/jss.v067.i01},
+  url = {https://doi.org/10.18637/jss.v067.i01}
+}
+
+@article{Lorenzen1996,
+  author = {Lorenzen, Kai},
+  title = {The relationship between body weight and natural mortality in juvenile and adult fish: a comparison of natural ecosystems and aquaculture},
+  journal = {Journal of Fish Biology},
+  year = {1996},
+  volume = {49},
+  number = {4},
+  pages = {627--642},
+  doi = {10.1111/j.1095-8649.1996.tb00060.x},
+  url = {https://doi.org/10.1111/j.1095-8649.1996.tb00060.x}
+}
+
+@article{Garcia2017FLBEIA,
+  author = {Garcia, Dorleta and S{\'a}nchez, Sonia and Prellezo, Ra{\'u}l and Urtizberea, Agurtzane and Andr{\'e}s, Marga},
+  title = {{FLBEIA}: A simulation model to conduct Bio-Economic evaluation of fisheries management strategies},
+  journal = {SoftwareX},
+  year = {2017},
+  volume = {6},
+  pages = {141--147},
+  doi = {10.1016/j.softx.2017.06.001},
+  url = {https://doi.org/10.1016/j.softx.2017.06.001}
+}
+
+@report{Cadigan2023,
+  author = {Cadigan, Noel G.},
+  title = {A Simple Mixed-Effects Model to Smooth and Extrapolate Weights-at-Age for 3Ps Cod},
+  year = {2023},
+  institution = {Fisheries and Oceans Canada, Canadian Science Advisory Secretariat},
+  series = {Research Document},
+  number = {2023/024},
+  pages = {iv + 49},
+  isbn = {978-0-660-47975-0}
+}
+
+@article{Maunder2006,
+  author = {Maunder, Mark N. and Harley, Shelton J. and Hampton, John},
+  title = {Including parameter uncertainty in forward projections of computationally intensive statistical population dynamic models},
+  journal = {ICES Journal of Marine Science},
+  year = {2006},
+  volume = {63},
+  number = {6},
+  pages = {969--979},
+  doi = {10.1016/j.icesjms.2006.03.016},
+  url = {https://doi.org/10.1016/j.icesjms.2006.03.016}
+}
+
+@article{Punt2020,
+  author = {Punt, Andr{\'e} E. and Dunn, Alistair and Elvarsson, Bjarki {\TH}{\'o}r and Hampton, John and Hoyle, Simon D. and Maunder, Mark N. and Methot, Richard D. and Nielsen, Anders},
+  title = {Essential features of the next-generation integrated fisheries stock assessment package: A perspective},
+  journal = {Fisheries Research},
+  year = {2020},
+  volume = {229},
+  pages = {105617},
+  doi = {10.1016/j.fishres.2020.105617},
+  url = {https://doi.org/10.1016/j.fishres.2020.105617}
+}
+
+@article{Fischer2023,
+  author = {Fischer, Simon H. and De Oliveira, Jos{\'e} A. A. and Mumford, John D. and Kell, Laurence T.},
+  title = {Risk equivalence in data-limited and data-rich fisheries management: An example based on the {ICES} advice framework},
+  journal = {Fish and Fisheries},
+  year = {2023},
+  volume = {24},
+  pages = {231--247},
+  doi = {10.1111/faf.12722},
+  url = {https://doi.org/10.1111/faf.12722}
+}
+
+@article{Thorson2014,
+  author = {Thorson, James T. and Jensen, Olaf P. and Zipkin, Elise F.},
+  title = {How variable is recruitment for exploited marine fishes? A hierarchical model for testing life history theory},
+  journal = {Canadian Journal of Fisheries and Aquatic Sciences},
+  year = {2014},
+  volume = {71},
+  number = {7},
+  pages = {973--983},
+  doi = {10.1139/cjfas-2013-0645},
+  url = {https://doi.org/10.1139/cjfas-2013-0645}
+}
+
+@report{Trochta2024,
+  author = {Trochta, John Tyler and Bogstad, Bjarte and Kovalev, Yury and Prozorkevich, Dmitry and Skaret, Georg and Vatnehol, Sindre and Howell, Daniel},
+  title = {Report on evaluation of harvest rules for Barents Sea capelin in subareas 1 and 2 (northeast arctic), excluding division 2.a west of 5{\textdegree}W -- full report},
+  year = {2024},
+  institution = {Institute of Marine Research},
+  series = {IMR-PINRO},
+  number = {2024-17},
+  url = {https://www.hi.no/hi/nettrapporter/imr-pinro-en-2024-17}
+}
+
+@report{ICES2020WKGMSE3,
+  author = {{ICES}},
+  title = {The third Workshop on Guidelines for Management Strategy Evaluations (WKGMSE3)},
+  year = {2020},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Scientific Reports},
+  volume = {2},
+  number = {116},
+  pages = {112},
+  doi = {10.17895/ices.pub.7627},
+  url = {https://doi.org/10.17895/ices.pub.7627}
+}
+
+@report{Perez2023Math4Fish,
+  author = {Pérez, A. and Zúñiga, M. J. and Gamaza, M. Á. and Jiménez, A. and Rincón, M.},
+  title = {Math4Fish -- Entregable 4.2: Resultados de la evaluación de estrategias de gestión co-creadas con el sector para el boquerón en el Golfo de Cádiz},
+  year = {2023},
+  institution = {IEO-CSIC}
+}
+
+@report{ICES2018WKPELA,
+  author = {{ICES}},
+  title = {Report of the Benchmark Workshop on Pelagic Stocks (WKPELA 2018)},
+  year = {2018},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES CM},
+  number = {2018/ACOM:32},
+  pages = {313},
+  doi = {10.17895/ices.pub.5432},
+  url = {https://doi.org/10.17895/ices.pub.5432}
+}
+
+@report{ICES2018WGHANSA,
+  author = {{ICES}},
+  title = {Report of the Working Group on Southern Horse Mackerel, Anchovy and Sardine (WGHANSA), 26--30 June 2018, Lisbon, Portugal},
+  year = {2018},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES CM},
+  number = {2018/ACOM:17},
+  pages = {605}
+}
+
+@report{ICES2019WGHANSA,
+  author = {{ICES}},
+  title = {Working Group on Southern Horse Mackerel, Anchovy and Sardine (WGHANSA)},
+  year = {2019},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Scientific Reports},
+  volume = {1},
+  number = {34},
+  pages = {653},
+  doi = {10.17895/ices.pub.4983},
+  url = {https://doi.org/10.17895/ices.pub.4983}
+}
+
+@report{ICES2020WGHANSA,
+  author = {{ICES}},
+  title = {Working Group on Southern Horse Mackerel, Anchovy and Sardine (WGHANSA)},
+  year = {2020},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Scientific Reports},
+  volume = {2},
+  number = {41},
+  pages = {655},
+  doi = {10.17895/ices.pub.5977},
+  url = {https://doi.org/10.17895/ices.pub.5977}
+}
+
+@report{ICES2021WGHANSA,
+  author = {{ICES}},
+  title = {Working Group on Southern Horse Mackerel, Anchovy and Sardine (WGHANSA)},
+  year = {2021},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Scientific Reports},
+  volume = {3},
+  number = {55},
+  pages = {689},
+  doi = {10.17895/ices.pub.8138},
+  url = {https://doi.org/10.17895/ices.pub.8138}
+}
+
+@report{ICES2022WGHANSA,
+  author = {{ICES}},
+  title = {Working Group on Southern Horse Mackerel, Anchovy and Sardine (WGHANSA)},
+  year = {2022},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Scientific Reports},
+  volume = {4},
+  number = {51},
+  pages = {518},
+  doi = {10.17895/ices.pub.19982720},
+  url = {https://doi.org/10.17895/ices.pub.19982720}
+}
+
+@report{ICES2023WGHANSA,
+  author = {{ICES}},
+  title = {Working Group on Southern Horse Mackerel, Anchovy and Sardine (WGHANSA)},
+  year = {2023},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Scientific Reports},
+  volume = {5},
+  number = {67},
+  pages = {621},
+  doi = {10.17895/ices.pub.23507922},
+  url = {https://doi.org/10.17895/ices.pub.23507922}
+}
+
+
+@report{ICES2021ReferencePoints,
+  author = {{ICES}},
+  title = {{ICES} fisheries management reference points for category 1 and 2 stocks; Technical Guidelines},
+  year = {2021},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Advice 2021},
+  number = {Section 16.4.3.1},
+  doi = {10.17895/ices.advice.7891},
+  url = {https://doi.org/10.17895/ices.advice.7891}
+}
+
+@report{ICES2022Cat23Guidance,
+  author = {{ICES}},
+  title = {{ICES} technical guidance for harvest control rules and stock assessments for stocks in categories 2 and 3},
+  year = {2022},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Advice 2022},
+  number = {Section 16.4.11},
+  pages = {20},
+  doi = {10.17895/ices.advice.19801564},
+  url = {https://doi.org/10.17895/ices.advice.19801564}
+}
+
+@article{SilvarViladomiu2022,
+  author = {Silvar-Viladomiu, Paula and Batts, Luke and Minto, Cóilín and Miller, David and Lordan, Colm},
+  title = {An empirical review of {ICES} reference points},
+  journal = {ICES Journal of Marine Science},
+  year = {2022},
+  volume = {79},
+  number = {10},
+  pages = {2563--2578},
+  doi = {10.1093/icesjms/fsac194},
+  url = {https://doi.org/10.1093/icesjms/fsac194}
+}
+
+@inproceedings{BegleyHowell2004,
+  author = {Begley, J. and Howell, D.},
+  title = {An overview of {Gadget}, the Globally applicable Area-Disaggregated General Ecosystem Toolbox},
+  year = {2004},
+  booktitle = {ICES CM 2004/FF:13}
+}
+
+@article{Elvarsson2014,
+  author = {Elvarsson, B. and Taylor, L. and Trenkel, V. and Kupca, V. and Stefansson, G.},
+  title = {A bootstrap method for estimating bias and variance in statistical fisheries modelling frameworks using highly disparate datasets},
+  journal = {African Journal of Marine Science},
+  year = {2014},
+  volume = {36},
+  number = {1},
+  pages = {99--110}
+}
+
+@article{Gislason2010,
+  author = {Gislason, H. and Daan, N. and Rice, J. C. and Pope, J. G.},
+  title = {Size, growth, temperature and the natural mortality of marine fish},
+  journal = {Fish and Fisheries},
+  year = {2010},
+  volume = {11},
+  pages = {149--158},
+  doi = {10.1111/j.1467-2979.2009.00350.x},
+  url = {https://doi.org/10.1111/j.1467-2979.2009.00350.x}
+}
+
+@report{ICES2019WKDLSSLS,
+  author = {{ICES}},
+  title = {Workshop on Data-limited Stocks of Short-Lived Species (WKDLSSLS)},
+  year = {2019},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Scientific Reports},
+  volume = {1},
+  number = {73},
+  pages = {166},
+  doi = {10.17895/ices.pub.5549},
+  url = {https://doi.org/10.17895/ices.pub.5549}
+}
+
+@report{ICES2019WKNSMSE,
+  author = {{ICES}},
+  title = {Workshop on North Sea stocks management strategy evaluation (WKNSMSE)},
+  year = {2019},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Scientific Reports},
+  volume = {1},
+  number = {12},
+  pages = {378},
+  doi = {10.17895/ices.pub.5090},
+  url = {https://doi.org/10.17895/ices.pub.5090}
+}
+
+@report{ICES2020WKDLSSLS2,
+  author = {{ICES}},
+  title = {Workshop on Data-limited Stocks of Short-Lived Species (WKDLSSLS2)},
+  year = {2020},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Scientific Reports},
+  volume = {2},
+  number = {99},
+  pages = {119},
+  doi = {10.17895/ices.pub.5984},
+  url = {https://doi.org/10.17895/ices.pub.5984}
+}
+
+@report{ICES2021WKLIFEX,
+  author = {{ICES}},
+  title = {Tenth Workshop on the Development of Quantitative Assessment Methodologies based on LIFE-history traits, exploitation characteristics, and other relevant parameters for data-limited stocks (WKLIFE X)},
+  year = {2021},
+  institution = {International Council for the Exploration of the Sea},
+  series = {ICES Scientific Reports},
+  doi = {10.17895/ices.pub.5985},
+  url = {https://doi.org/10.17895/ices.pub.5985}
+}
+
+@article{Kell2007,
+  author = {Kell, L. T. and Mosqueira, I. and Grosjean, P. and Fromentin, J.-M. and Garcia, D. and Hillary, R. and Jardim, E. and Mardle, S. and Pastoors, M. and Poos, J.},
+  title = {{FLR}: an open-source framework for the evaluation and development of management strategies},
+  journal = {ICES Journal of Marine Science},
+  year = {2007},
+  volume = {64},
+  number = {4},
+  pages = {640--646}
+}
+
+@report{Rincon2022,
+  author = {Rincón, M. and Ramos, F. and Tornero, J. and Garrido, S. and Elvarsson, B. and Lentin, J.},
+  title = {Gadget for anchovy 9a South: Model description and results to provide catch advice and reference points},
+  year = {2022},
+  institution = {ICES Working Group on Southern Horse Mackerel, Anchovy and Sardine (WGHANSA-1)}
+}
+
+@article{SanchezMarono2021,
+  author = {Sánchez-Maroño, S. and Uriarte, A. and Ibaibarriaga, L. and Citores, L.},
+  title = {Adapting Simple Index-Based Catch Rules for Data-Limited Stocks to Short-Lived Fish Stocks' Characteristics},
+  journal = {Frontiers in Marine Science},
+  year = {2021},
+  volume = {8},
+  doi = {10.3389/fmars.2021.662942},
+  url = {https://doi.org/10.3389/fmars.2021.662942}
+}
+
+@article{Taylor2007Gadget,
+  author = {Taylor, L. and Begley, J. and Kupca, V. and Stefansson, G.},
+  title = {A simple implementation of the statistical modelling framework {Gadget} for cod in Icelandic waters},
+  journal = {African Journal of Marine Science},
+  year = {2007},
+  volume = {29},
+  number = {2},
+  pages = {223--245}
+}
+
+@article{Beverton1963,
+  author = {Beverton, Raymond J. H.},
+  title = {Maturation, growth and mortality of clupeid and engraulid stocks in relation to fishing},
+  year = {1963}
+}
+
+
+@article{Uriarte2016,
+  author = {Uriarte, Andres and Ibaibarriaga, Leire and Pawlowski, Lionel and Mass{\'e}, Jacques and Petitgas, Pierre and Santos, Mar{\'i}a and Skagen, Dankert},
+  title = {Assessing natural mortality of Bay of Biscay anchovy from survey population and biomass estimates},
+  journal = {Canadian Journal of Fisheries and Aquatic Sciences},
+  year = {2016},
+  volume = {73},
+  number = {2},
+  pages = {216--234}
+}
+
+@report{ICES2026WKBHERSPRAT,
+  author      = {{ICES}},
+  year        = {2026},
+  title       = {Benchmark Workshop on Selected Herring and Sprat Stocks (WKBHERSPRAT)},
+  institution = {International Council for the Exploration of the Sea (ICES)},
+  address     = {Copenhagen, Denmark},
+  series      = {ICES Scientific Reports},
+  volume      = {8},
+  number      = {10},
+  pages       = {732},
+  issn        = {2618-1371},
+  doi         = {10.17895/ices.pub.31538287},
+  url = {https://doi.org/10.17895/ices.pub.31538287}
+}
+
+@report{ICES2024WGHANSA,
+  author = {{ICES}},
+  year = {2024},
+  title = {Working Group on Southern Horse Mackerel, Anchovy and Sardine (WGHANSA)},
+  institution = {International Council for the Exploration of the Sea},
+  address = {Copenhagen, Denmark},
+  series = {ICES Scientific Reports},
+  volume = {6},
+  number = {46},
+  pages = {738},
+  issn = {2618-1371},
+  doi = {10.17895/ices.pub.26003356},
+  url = {https://doi.org/10.17895/ices.pub.26003356}
+}
+
+
+@report{ICES2025WGHANSA,
+  author      = {{ICES}},
+  year        = {2025},
+  title       = {Working Group on Southern Horse Mackerel, Anchovy and Sardine (WGHANSA)},
+  institution = {International Council for the Exploration of the Sea (ICES)},
+  address     = {Copenhagen, Denmark},
+  series      = {ICES Scientific Reports},
+  volume      = {7},
+  number      = {70},
+  pages       = {631},
+  issn        = {2618-1371},
+  doi         = {10.17895/ices.pub.29335520}
+}
+
+@techreport{ICES2020,
+  author      = {{ICES}},
+  year        = {2020},
+  title       = {The third Workshop on Guidelines for Management Strategy Evaluations (WKGMSE3)},
+  institution = {ICES},
+  series      = {ICES Scientific Reports},
+  volume      = {2},
+  number      = {116},
+  pages       = {112},
+  doi         = {10.17895/ices.pub.7627}
+}

@@ -1,0 +1,732 @@
+---
+title: "Validación open-loop del Operating Model de referencia para el shortcut MSE de ane.27.9aS"
+
+author:
+  - "María José Zúñiga Basualto"
+  - "Fernando Ramos"
+  - "María Ángeles Gamaza"
+
+date: "`r format(Sys.Date(), '%d-%m-%Y')`"
+
+output:
+  bookdown::pdf_document2:
+    toc: false
+    toc_depth: 3
+    number_sections: true
+    keep_tex: false
+
+bibliography: report_biblio.bib
+csl: ices-journal-of-marine-science.csl
+link-citations: true
+---
+
+
+
+**Working Document 04 — WKSPSIM 2026**
+
+**Stock:** Anchovy (*Engraulis encrasicolus*) in the southern part of Division 9.a  
+(Gulf of Cadiz and southern part of Portugal), ane.27.9aS
+
+**Affiliation:** Instituto Español de Oceanografía (IEO-CSIC), Centro Oceanográfico de Cádiz, Spain
+
+
+
+```{r setup, include=FALSE}
+library(knitr)
+library(here)
+library(dplyr)
+library(tidyr)
+library(kableExtra)
+
+fig_dir <- here("outputs", "OM")
+tab_dir <- here("outputs", "OM", "tables")
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = "center"
+)
+
+read_output_csv <- function(filename) {
+  path <- file.path(tab_dir, filename)
+  if (!file.exists(path)) {
+    stop(
+      paste0(
+        "No se encontró el output requerido: ", path,
+        ". Ejecute primero 13_VALIDATE_REFERENCE_OM.R."
+      )
+    )
+  }
+  read.csv(path, check.names = FALSE)
+}
+
+include_output_figure <- function(filename, ...) {
+  path <- file.path(fig_dir, filename)
+  if (!file.exists(path)) {
+    stop(
+      paste0(
+        "No se encontró la figura requerida: ", path,
+        ". Ejecute primero 13_VALIDATE_REFERENCE_OM.R."
+      )
+    )
+  }
+  knitr::include_graphics(path, ...)
+}
+```
+
+# Enfoque general
+
+El Operating Model (OM) del *shortcut* Management Strategy Evaluation (MSE)
+de *ane.27.9aS* se construyó a partir del assessment SS3 adoptado en WKBANSP
+[@ICES2024WKBANSP] y documentado posteriormente en el Stock Annex
+[@ICES2025StockAnnex9aS]. El condicionamiento de los componentes biológico,
+stock--reclutamiento y pesquero se documenta en los WD01--03.
+
+Antes de incorporar el assessment y la regla de gestión, el OM se validó
+mediante simulaciones *open-loop*. En estas simulaciones no se ejecuta un
+assessment durante la proyección y el estado del stock se obtiene directamente
+del OM. La validación comprueba la implementación de las reglas de proyección
+y el comportamiento de la población y la pesquería bajo condiciones
+predefinidas.
+
+La validación utiliza 100 OMs condicionados y 10 realizaciones del error de
+proceso del reclutamiento por OM, para un total de 1000 trayectorias durante
+2025--2054. La variabilidad entre OMs procede del condicionamiento histórico.
+Las diez réplicas de cada OM comparten la misma condición histórica y difieren
+en la realización futura del error de proceso del reclutamiento [@Punt2016].
+
+Se evaluaron dos controles *open-loop*. C0 fija la mortalidad por pesca en cero
+y permite comprobar la dinámica de la población en ausencia de pesca. C7000
+prescribe una captura anual constante de 7000 t y permite comprobar la
+respuesta del stock, la mortalidad por pesca y la captura realizada. Estos
+controles se utilizan para validar el OM y no corresponden a Management
+Procedures (MPs) candidatas.
+
+La secuencia de validación es:
+
+\[
+\begin{aligned}
+&\text{OM condicionado} \\
+&\downarrow \\
+&\text{100 OMs} \\
+&\downarrow \\
+&\text{10 realizaciones por OM} \\
+&\downarrow \\
+&\text{1000 trayectorias} \\
+&\downarrow \\
+&\begin{cases}
+\text{C0: sin pesca} \\
+\text{C7000: captura anual constante de 7000 t}
+\end{cases} \\
+&\downarrow \\
+&\text{validación open-loop}
+\end{aligned}
+\]
+
+Los componentes utilizados para cerrar el ciclo de gestión se documentan en
+los WD siguientes: error de evaluación en WD05, regla de gestión en WD06 y
+evaluación de los MPs en WD07.
+
+
+# Métodos
+
+## Configuración del OM de referencia y diseño de simulación
+
+La validación utiliza los componentes biológico, stock--reclutamiento y
+pesquero condicionados en los WD01--03. El OM representa la población de
+*ane.27.9aS* por edad y trimestre y una única flota, SEINE. La interacción
+entre la población y la pesquería se implementa en FLBEIA mediante el modelo
+de esfuerzo `SMFB` y la ecuación de captura de Baranov
+[@Garcia2017FLBEIA].
+
+Las proyecciones cubren 2025--2054. Los 100 OMs condicionados se proyectan
+mediante 10 realizaciones del error de proceso del reclutamiento por OM, para
+un total de 1000 trayectorias. Las diez realizaciones conservan los parámetros
+del OM de origen y difieren en la realización del error de proceso futuro del
+reclutamiento.
+
+Cada OM mantiene sus parámetros específicos de la relación
+stock--reclutamiento de Beverton--Holt. En la configuración de referencia, el
+error de proceso del reclutamiento utiliza una desviación estándar común,
+definida como la mediana de los valores estimados para los 100 OMs
+condicionados:
+
+\[
+\sigma_R^{REF}=0.2163.
+\]
+
+El error se aplica durante 2025--2054 mediante multiplicadores lognormales con
+corrección de sesgo.
+
+Las reglas de proyección de los componentes biológico y pesquero corresponden
+a las definidas durante el condicionamiento del OM. El peso a la edad se fija
+a partir de la media 2022--2024 específica de cada OM y la mortalidad natural
+se obtiene mediante el escalamiento por peso corporal de @Lorenzen1996. La
+capturabilidad de la flota se basa en 2020--2024 y la asignación estacional de
+las capturas en 2015--2024, ambas específicas de cada OM. Estos valores se
+mantienen durante 2025--2054.
+
+Los puntos de referencia utilizados en los diagnósticos son
+\(B_{lim}=4721\) t y \(B_{pa}=6561\) t. En esta etapa se utilizan para
+cuantificar la frecuencia con que las trayectorias se sitúan por debajo de
+estos niveles y no como criterios de aceptación de una Management Procedure.
+
+
+### Configuración resumida
+
+```{r tab-reference-configuration}
+reference_configuration <- tibble::tribble(
+  ~Componente, ~Configuración,
+  "Stock", "ane.27.9aS",
+  "Período histórico", "1989–2024",
+  "Período de proyección", "2025–2054",
+  "Edades", "0–3+",
+  "Estaciones", "Q1–Q4",
+  "SSB", "Q2",
+  "Entrada del reclutamiento", "Edad 0, Q3",
+  "OMs condicionados", "100",
+  "Realizaciones por OM", "10",
+  "Trayectorias de proyección", "1000",
+  "Relación stock–reclutamiento", "Beverton–Holt específica por OM",
+  "Error de proceso del reclutamiento", "Lognormal; sigmaR REF = 0.2163",
+  "Estado del stock durante open-loop", "Obtenido directamente del OM",
+  "Assessment durante open-loop", "Ninguno",
+  "Blim", "4721 t",
+  "Bpa", "6561 t"
+)
+
+knitr::kable(
+  reference_configuration,
+  booktabs = TRUE,
+  caption = "Configuración del Operating Model de referencia y diseño de la validación open-loop."
+)
+```
+
+### Parametrización del error de proceso del reclutamiento en REF
+
+En la configuración de referencia, el error de proceso del reclutamiento
+utiliza una desviación estándar común, definida como la mediana de los valores
+estimados para los 100 OMs condicionados:
+
+\[
+\sigma_R^{REF}
+=
+\operatorname{median}_{i=1,\ldots,100}(\sigma_{R,i})
+=
+0.2163.
+\]
+
+Cada OM conserva sus parámetros \(a_i\) y \(b_i\) de la relación de
+Beverton--Holt, mientras que \(\sigma_R^{REF}\) es común a las 1000
+trayectorias. Durante 2025--2054, cada trayectoria utiliza una realización
+independiente del error de proceso del reclutamiento.
+
+La parametrización con \(\sigma_R\) específico por OM se evalúa por separado
+en el análisis de robustez y no forma parte de la configuración REF validada
+en este WD.
+
+## Fuentes de variabilidad representadas en la validación
+
+La validación representa dos fuentes de variabilidad.
+
+La **variabilidad entre OMs** procede del condicionamiento histórico. Los 100
+OMs representan condiciones alternativas del stock y conservan sus parámetros
+biológicos, los parámetros de la relación stock--reclutamiento y los
+componentes utilizados para proyectar la pesquería.
+
+La **variabilidad dentro de cada OM** procede del error de proceso futuro del
+reclutamiento. Cada OM se proyecta mediante 10 realizaciones independientes
+durante 2025--2054. Estas realizaciones comparten la misma condición del OM y
+el mismo \(\sigma_R^{REF}=0.2163\), pero difieren en la secuencia de
+desviaciones del reclutamiento.
+
+La validación *open-loop* no incorpora error de evaluación. El estado del
+stock utilizado durante la simulación procede directamente del OM. El error
+de evaluación se incorpora y valida posteriormente como parte de la
+implementación *closed-loop* del MSE.
+
+## Escenarios de validación open-loop
+
+Se utilizaron dos escenarios para validar el OM: ausencia de pesca (C0) y una
+captura aconsejada anual constante de 7000 t (C7000).
+
+### C0: control sin pesca
+
+En C0, la captura aconsejada se fija en cero durante 2025--2054, eliminando
+la mortalidad por pesca durante la proyección. Este escenario permite evaluar
+la dinámica de la población sin interacción con la pesquería.
+
+C0 se utiliza para comprobar la evolución de la SSB y el reclutamiento, la
+propagación de las cohortes y la implementación de la relación de
+Beverton--Holt y del error de proceso del reclutamiento.
+
+### C7000: captura aconsejada constante
+
+En C7000 se prescribe una captura aconsejada anual de 7000 t durante
+2025--2054. Esta captura constituye una entrada al componente pesquero y no
+fija directamente la mortalidad por pesca ni la captura realizada. Ambas se
+determinan durante la simulación a partir de la abundancia y estructura del
+stock y de la dinámica de la pesquería implementada en FLBEIA.
+
+C7000 se utiliza para comprobar la respuesta de la SSB, la mortalidad por
+pesca y la captura realizada bajo una captura aconsejada constante. Este
+escenario se utiliza como control de la implementación del OM y no constituye
+una Management Procedure (MP) candidata.
+
+## Controles estructurales y numéricos
+
+Antes de los diagnósticos *open-loop* se comprobó la integridad de los outputs
+de C0 y C7000, incluyendo el número de OMs y trayectorias, la cobertura del
+período 2025--2054, la ausencia de valores perdidos, no finitos o negativos y
+el cumplimiento de las condiciones definidas para cada escenario.
+
+
+## Continuidad histórico--proyección y reglas de proyección
+
+La transición entre 2024 y 2025 se evaluó para comprobar la continuidad del
+OM condicionado y la aplicación de las reglas definidas para la proyección.
+No se requiere igualdad entre los valores de ambos años, ya que algunas
+variables cambian como resultado de la dinámica poblacional o de su
+parametrización para 2025--2054.
+
+Para el componente biológico se examinó la transición de la SSB y el
+reclutamiento, la propagación de cohortes entre Q4 de 2024 y Q1 de 2025 y,
+bajo C0, la supervivencia entre trimestres de acuerdo con la mortalidad
+natural implementada. También se comprobó que el peso a la edad y la
+mortalidad natural durante la proyección correspondieran a los valores
+definidos para cada OM y permanecieran constantes cuando así estaba
+especificado.
+
+Para el componente pesquero se comprobó la capturabilidad, la selectividad de
+desembarques y descartes y la asignación estacional utilizadas durante la
+proyección. La capturabilidad y las proporciones trimestrales se verificaron
+para cada OM, incluyendo su constancia durante 2025--2054 y, para la
+asignación estacional, que las cuatro proporciones sumaran uno.
+
+## Diagnóstico biológico bajo C0
+
+Bajo C0 se resume anualmente la distribución de SSB y reclutamiento entre las
+1000 trayectorias durante 2025--2054. Para ambas variables se calculan la
+mediana, los percentiles 5 y 95 y los valores mínimo y máximo. Para la SSB se
+calcula además la proporción anual de trayectorias por debajo de \(B_{lim}\) y
+\(B_{pa}\).
+
+### Validación del error de proceso del reclutamiento
+
+El error de proceso del reclutamiento se valida comparando el reclutamiento
+realizado bajo C0 con la expectativa determinista de la relación de
+Beverton--Holt correspondiente a cada OM:
+
+\[
+R^{BH}_{y,i} =
+\frac{a_i SSB_{y,i}}
+     {b_i + SSB_{y,i}},
+\]
+
+donde \(a_i\) y \(b_i\) son los parámetros específicos del OM \(i\).
+
+Para cada año y trayectoria se calcula el residuo logarítmico
+
+\[
+e_{y,j} =
+\log\left(
+\frac{R_{y,j}}
+     {R^{BH}_{y,j}}
+\right).
+\]
+
+En la configuración REF, las 1000 trayectorias utilizan una desviación
+estándar común del error de proceso,
+
+\[
+\sigma_R^{REF}=0.2163.
+\]
+
+Dado que los multiplicadores de reclutamiento se generan mediante una
+distribución lognormal con corrección de sesgo, se espera que
+
+\[
+E(e) =
+-\frac{1}{2}\left(\sigma_R^{REF}\right)^2
+\]
+
+y
+
+\[
+SD(e) = \sigma_R^{REF}.
+\]
+
+La validación se realiza sobre las 30 000 observaciones correspondientes a
+1000 trayectorias y 30 años de proyección. La media y la desviación estándar
+observadas de \(e\) se comparan con sus valores esperados. También se comprueba
+la ausencia de valores perdidos o no finitos.
+
+## Diagnóstico stock--pesquería bajo C7000
+
+Bajo C7000 se resumen anualmente la captura realizada, la mortalidad por pesca
+y la SSB entre las 1000 trayectorias. La captura realizada se compara con la
+captura aconsejada anual de 7000 t, mientras que la mortalidad por pesca se
+obtiene de la simulación.
+
+### Cumplimiento de la captura aconsejada
+
+Para cada año y trayectoria se calcula la proporción de cumplimiento de la
+captura aconsejada:
+
+\[
+A_{y,j} =
+\frac{C_{y,j}}{7000},
+\]
+
+donde \(C_{y,j}\) es la captura realizada en el año \(y\) y la trayectoria
+\(j\).
+
+Las observaciones se clasifican en cuatro intervalos de cumplimiento:
+\(\geq99\%\), 90--99%, 50--90% y <50%. Para cada intervalo se resumen el
+cumplimiento, la mortalidad por pesca realizada y la SSB, junto con la
+proporción de observaciones con SSB inferior a \(B_{lim}\) y \(B_{pa}\).
+
+### Respuesta de la SSB
+
+La SSB se resume anualmente mediante la mediana, los percentiles 5 y 95 y los
+valores mínimo y máximo. También se calcula la proporción anual de trayectorias
+por debajo de \(B_{lim}\) y \(B_{pa}\).
+
+Para cada trayectoria se registra además si la SSB alcanza durante 2025--2054
+valores inferiores a \(B_{lim}\), \(B_{pa}\), 1000 t o 100 t. Para
+\(B_{lim}\) y \(B_{pa}\) se contabiliza también el número de años por debajo
+de cada umbral.
+
+### Comparación pareada entre C7000 y C0
+
+Las trayectorias de C7000 que alcanzan una SSB inferior a 1000 t se emparejan
+con las trayectorias correspondientes de C0 utilizando el mismo OM y la misma
+realización del error de proceso del reclutamiento.
+
+Para cada trayectoria pareada bajo C0 se calcula la SSB mínima durante
+2025--2054 y se registra si alcanza valores inferiores a \(B_{lim}\) o
+\(B_{pa}\). La comparación permite evaluar las mismas condiciones del OM y
+realizaciones del reclutamiento bajo C7000 y en ausencia de pesca.
+
+# Resultados
+
+## Controles estructurales y numéricos
+
+Los escenarios C0 y C7000 incluyeron 100 OMs y 1000 trayectorias por
+escenario, correspondientes a 10 realizaciones por OM. Las series de
+reclutamiento, SSB, mortalidad por pesca y captura cubrieron 2025--2054 y no
+presentaron valores perdidos, no finitos ni negativos. En C0, la mortalidad
+por pesca y la captura fueron cero durante todo el período de proyección. En
+C7000, la mortalidad por pesca fue positiva y variable entre trayectorias y la
+captura realizada no superó las 7000 t anuales.
+
+## Continuidad histórico--proyección
+
+Los controles de continuidad entre el período histórico y la proyección se
+resumen en la Tabla \@ref(tab:results-continuity). La mediana del reclutamiento fue
+7.16 millones en 2024 y 7.34 millones en 2025. La SSB mediana fue 11,053 t
+en 2024 y 13,057 t en 2025.
+
+Bajo C0, la supervivencia de las cohortes entre trimestres consecutivos
+coincidió con la calculada a partir de la mortalidad natural, con una
+diferencia absoluta máxima de \(1.11\times10^{-16}\). Los pesos por edad proyectados correspondieron a las medias específicas de
+cada OM para 2022--2024 y la mortalidad natural a los valores calculados
+mediante el escalamiento de Lorenzen; en ambos casos, la diferencia absoluta
+máxima fue cero.
+
+La mortalidad natural y la capturabilidad permanecieron constantes dentro de
+cada OM durante 2025--2054. La selectividad de desembarques fue 1 y la de
+descartes 0. Las proporciones estacionales coincidieron con las medias
+específicas de cada OM para 2015--2024 y sumaron uno, con una desviación
+absoluta máxima de \(1.11\times10^{-16}\).
+
+
+```{r results-continuity, results='asis', tab.cap="Resumen de los controles de continuidad entre el período histórico y la proyección."}
+continuity_file <- file.path(tab_dir, "reference_OM_continuity.csv")
+
+if (file.exists(continuity_file)) {
+  table_continuity <- read.csv(continuity_file, check.names = FALSE)
+
+  table_continuity %>%
+    knitr::kable(
+      format = "latex",
+      booktabs = TRUE,
+      longtable = FALSE,
+      escape = TRUE
+      # caption = "Resumen de los controles de continuidad entre el período histórico y la proyección."
+    ) %>%
+    kableExtra::kable_styling(
+      latex_options = c("hold_position"),
+      font_size = 8
+    ) %>%
+    kableExtra::column_spec(1, width = "2.8cm") %>%
+    kableExtra::column_spec(2, width = "5.0cm") %>%
+    kableExtra::column_spec(3, width = "7.0cm")
+} else {
+  cat("*Tabla pendiente: ejecutar el script 13 con la exportación de `reference_OM_continuity.csv`.*")
+}
+```
+
+
+
+## Comportamiento biológico bajo C0
+
+Bajo C0, la mediana anual de SSB se situó entre 14,027 y 16,880 t durante
+2025--2054. Considerando las 1000 trayectorias y los 30 años de proyección,
+la SSB se situó entre 7,365 y 40,915 t. La proporción anual de trayectorias
+con SSB inferior a \(B_{lim}\) o \(B_{pa}\) fue cero durante todo el período.
+
+La mediana anual del reclutamiento se situó entre 7.44 y 7.73 millones de
+reclutas. Considerando todas las trayectorias y años de proyección, el
+reclutamiento se situó entre 2.79 y 19.91 millones de reclutas. La evolución
+temporal de la SSB y el reclutamiento bajo C0 se presenta en la
+Figura \@ref(fig:fig-open-loop-validation).
+
+
+
+```{r load-c0-results, include=FALSE}
+c0_ssb_file <- file.path(tab_dir, "C0_SSB_summary.csv")
+c0_r_file <- file.path(tab_dir, "C0_recruitment_summary.csv")
+
+if (file.exists(c0_ssb_file)) {
+  C0_SSB_summary <- read.csv(c0_ssb_file, check.names = FALSE)
+}
+
+if (file.exists(c0_r_file)) {
+  C0_R_summary <- read.csv(c0_r_file, check.names = FALSE)
+}
+```
+
+
+## Error de proceso del reclutamiento
+
+El diagnóstico incluyó 30,000 residuos logarítmicos correspondientes a las
+1000 trayectorias y los 30 años de proyección. No se registraron valores
+perdidos ni no finitos.
+
+Los valores esperados y observados de la media y la desviación estándar de
+los residuos logarítmicos se presentan en la Tabla \@ref(tab:results-bh). 
+
+Para \(\sigma_R^{REF}=0.216253\), la media esperada fue -0.023383 y la media
+observada fue -0.023206, con una diferencia de 0.000177. La desviación
+estándar esperada fue 0.216253 y la observada fue 0.215726, con una
+diferencia de -0.000527.
+
+
+```{r results-bh, results='asis', tab.cap="Validación del error de proceso del reclutamiento en el Operating Model de referencia."}
+bh_file <- file.path(
+  tab_dir,
+  "BH_process_error_summary.csv"
+)
+
+BH_process_summary <- read.csv(
+  bh_file,
+  check.names = FALSE
+)
+
+BH_table <- data.frame(
+  Diagnóstico = c(
+    "Media del residuo logarítmico",
+    "Desviación estándar del residuo logarítmico"
+  ),
+  Esperado = c(
+    BH_process_summary$expected_mean[1],
+    BH_process_summary$expected_sd[1]
+  ),
+  Observado = c(
+    BH_process_summary$observed_mean[1],
+    BH_process_summary$observed_sd[1]
+  ),
+  Diferencia = c(
+    BH_process_summary$mean_difference[1],
+    BH_process_summary$sd_difference[1]
+  )
+)
+
+knitr::kable(
+  BH_table,
+  format = "latex",
+  digits = 6,
+  booktabs = TRUE,
+  escape = TRUE
+  # caption = paste0(
+  #   "Validación del error de proceso del reclutamiento ",
+  #   "en el Operating Model de referencia."
+  # )
+) %>%
+  kableExtra::kable_styling(
+    latex_options = "hold_position",
+    font_size = 9
+  )
+```
+
+
+
+## Respuesta stock--pesquería bajo C7000
+
+De las 30,000 observaciones año--trayectoria, 29,409 (98.03%) presentaron un
+cumplimiento de la captura aconsejada igual o superior al 99%. El
+cumplimiento fue inferior al 99% en 591 observaciones (1.97%), inferior al
+90% en 220 (0.73%) e inferior al 50% en 157 (0.52%). La mediana anual de la
+captura realizada fue 7000 t durante 2025--2054.
+
+Para cumplimientos \(\geq99\%\), las proporciones de observaciones con SSB
+inferior a \(B_{lim}\) y \(B_{pa}\) fueron 0.002 y 0.042, respectivamente.
+Para cumplimientos de 90--99%, estas proporciones fueron 0.658 y 1.000. En
+las dos clases con cumplimiento inferior al 90%, ambas proporciones fueron
+1.000 (Tabla \@ref(tab:results-attainment)).
+
+La mediana anual de SSB bajo C7000 se situó entre 10,935 y 13,057 t. La
+máxima proporción anual de trayectorias con SSB inferior a \(B_{lim}\) fue
+0.028, registrada en 2049, y la máxima proporción anual por debajo de
+\(B_{pa}\) fue 0.079, registrada en 2048. La evolución temporal de la captura,
+la mortalidad por pesca, el reclutamiento y la SSB bajo C0 y C7000 se presenta
+en la Figura \@ref(fig:fig-open-loop-validation).
+
+```{r results-attainment, results='asis', tab.cap="Cumplimiento de la captura aconsejada y estado asociado del stock y la pesquería bajo C7000."}
+attainment_file <- file.path(tab_dir, "C7000_catch_attainment_by_class.csv")
+
+if (file.exists(attainment_file)) {
+  C7000_attainment_by_class <- read.csv(attainment_file, check.names = FALSE)
+
+  C7000_table <- C7000_attainment_by_class %>%
+    transmute(
+      `Catch attainment` = catch_class,
+      n = n,
+      `Median F` = median_F,
+      `Median SSB (t)` = median_SSB,
+      `P(SSB < Blim)` = p_blim,
+      `P(SSB < Bpa)` = p_bpa
+    )
+
+  C7000_table %>%
+    knitr::kable(
+      format = "latex",
+      digits = 3,
+      booktabs = TRUE,
+      escape = TRUE
+      # caption = "Cumplimiento de la captura aconsejada y estado asociado del stock y la pesquería bajo C7000."
+    ) %>%
+    kableExtra::kable_styling(
+      latex_options = c("hold_position"),
+      font_size = 9
+    )
+}
+```
+
+
+
+
+```{r fig-open-loop-validation, fig.cap="Trayectorias históricas y proyectadas del Operating Model bajo los escenarios C0 y C7000. Las líneas representan las medianas anuales y las bandas los percentiles 5 y 95. La línea vertical separa el período histórico (1989--2024) de la proyección (2025--2054). En el panel de SSB se muestran Blim y Bpa.", out.width="95%", fig.pos="!ht"}
+validation_fig <- file.path(fig_dir, "Fig_reference_OM_validation_C0_C7000.png")
+
+if (file.exists(validation_fig)) {
+  knitr::include_graphics(validation_fig)
+}
+```
+
+
+
+## Trayectorias por debajo de los umbrales de SSB y comparación pareada con C0
+
+Durante 2025--2054, 135 de las 1000 trayectorias de C7000 (13.5%) presentaron
+al menos un año con SSB inferior a \(B_{lim}\), mientras que 469 (46.9%)
+presentaron al menos un año con SSB inferior a \(B_{pa}\). Trece trayectorias
+(1.3%) presentaron SSB inferior a 1000 t y 12 (1.2%) inferior a 100 t. El
+número máximo de años con SSB inferior a \(B_{lim}\) y \(B_{pa}\) dentro de
+una trayectoria fue 26 y 28, respectivamente.
+
+Las 13 trayectorias con SSB inferior a 1000 t bajo C7000 se compararon con
+las trayectorias correspondientes bajo C0, conservando el mismo OM y la misma
+realización estocástica del reclutamiento. Bajo C0, la SSB mínima de estas
+13 trayectorias se situó entre 7,365 y 11,914 t. Ninguna presentó SSB
+inferior a \(B_{lim}\) o \(B_{pa}\).
+
+# Reproducibilidad
+
+La validación *open-loop* se ejecuta mediante los scripts
+`12_RUN_OM_Reference_for_validation_OM.R` y
+`13_VALIDATE_REFERENCE_OM.R`.
+
+`12_RUN_OM_Reference_for_validation_OM.R` utiliza los objetos condicionados
+del OM para ejecutar los escenarios C0 y C7000. Cada escenario se distribuye
+en 10 bloques de 100 trayectorias. Los archivos de mapeo asociados conservan
+la correspondencia entre cada trayectoria, el OM de origen y la réplica
+estocástica.
+
+`13_VALIDATE_REFERENCE_OM.R` combina los 10 bloques de cada escenario,
+reconstruye la identidad de las 1000 trayectorias y ejecuta los controles
+estructurales, de continuidad y de comportamiento biológico y pesquero
+descritos en este WD. Las figuras se guardan en `outputs/OM/` y las tablas
+utilizadas en el documento en `outputs/OM/tables/`.
+
+La secuencia computacional es:
+
+\[
+\begin{aligned}
+&\texttt{12\_RUN\_OM\_Reference\_for\_validation\_OM.R} \\
+&\downarrow \\
+&\begin{cases}
+\texttt{OM\_validation\_C0\_block\_01...10.rds} \\
+\texttt{OM\_validation\_C7000\_block\_01...10.rds}
+\end{cases} \\
+&\downarrow \\
+&\texttt{13\_VALIDATE\_REFERENCE\_OM.R} \\
+&\downarrow \\
+&\begin{cases}
+\text{figuras} \\
+\text{tablas CSV} \\
+\text{diagnósticos de validación}
+\end{cases}
+\end{aligned}
+\]
+
+El R Markdown no ejecuta nuevamente las simulaciones ni recalcula los
+diagnósticos. Los resultados numéricos, tablas y figuras se obtienen de los
+outputs generados por los scripts anteriores, manteniendo la correspondencia
+entre código, output y resultado reportado.
+
+# Conclusiones
+
+- La continuidad entre el período histórico y la proyección indica que la
+  dinámica de la población durante 2025--2054 mantiene las reglas biológicas
+  y pesqueras definidas durante el condicionamiento del OM. Los cambios
+  proyectados en SSB y reclutamiento resultan, por tanto, de la dinámica
+  simulada y de la mortalidad por pesca aplicada.
+
+- En ausencia de pesca, ninguna trayectoria presentó SSB inferior a
+  \(B_{lim}\) o \(B_{pa}\). Bajo la mortalidad natural, la relación
+  stock--reclutamiento y la variabilidad del reclutamiento definidas para REF,
+  la población se mantuvo por encima de ambos límites durante el período de
+  proyección.
+
+- La correspondencia entre la distribución observada y esperada de los
+  residuos del reclutamiento indica que la variabilidad interanual aplicada
+  alrededor de la relación de Beverton--Holt reproduce el error de proceso
+  especificado para REF. Esta variabilidad genera años de reclutamiento por
+  encima y por debajo de la expectativa asociada a la SSB de cada OM.
+
+- Bajo C7000, la reducción de la SSB coincidió con un aumento de la mortalidad
+  por pesca necesaria para aproximarse a la captura aconsejada. A niveles
+  bajos de SSB, el sistema dejó de alcanzar las 7000 t en parte de las
+  trayectorias. Este comportamiento refleja la dependencia de la captura
+  realizable respecto de la biomasa disponible y de la mortalidad por pesca.
+
+- Las trayectorias que alcanzaron SSB inferior a 1000 t bajo C7000
+  permanecieron por encima de \(B_{pa}\) en sus correspondientes trayectorias
+  bajo C0. Al conservar el mismo OM y la misma realización estocástica del
+  reclutamiento, esta comparación indica que los valores bajos de SSB
+  observados bajo C7000 resultan de la interacción entre la presión pesquera
+  y la dinámica de la población, y no de esas mismas realizaciones del
+  reclutamiento en ausencia de pesca.
+
+En conjunto, la validación *open-loop* muestra que el OM de referencia
+representa la dinámica de la población en ausencia de pesca, la variabilidad
+del reclutamiento definida para REF y la respuesta del stock a la presión
+pesquera. Estos resultados permiten utilizar el OM como base para la
+implementación *closed-loop*. C7000 se utiliza como escenario de validación y
+no permite inferir por sí solo la sostenibilidad de una captura anual de
+7000 t ni el desempeño de una Management Procedure.
+
+# Referencias

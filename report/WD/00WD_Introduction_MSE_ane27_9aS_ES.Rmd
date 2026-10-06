@@ -1,0 +1,155 @@
+---
+title: "Background and management context for the MSE of anchovy (ane.27.9aS)"
+author:
+  - "María José Zúñiga"
+  - "Fernando Ramos"
+  - "María Ángeles Gamaza"
+date: "October 2026"
+lang: en
+output:
+  bookdown::pdf_document2:
+    toc: false
+    number_sections: true
+    keep_tex: false
+bibliography: report_biblio.bib
+csl: ices-journal-of-marine-science.csl
+link-citations: true
+---
+
+**Working Document 00 — WKSPSIM 2026**
+
+**Stock:** Anchovy (*Engraulis encrasicolus*) in the southern part of Division 9.a  
+(Gulf of Cadiz and southern part of Portugal), ane.27.9aS
+
+**Affiliation:** Instituto Español de Oceanografía (IEO-CSIC), Centro Oceanográfico de Cádiz, Spain
+
+```{r setup, include=FALSE}
+library(knitr)
+library(here)
+library(FLCore)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+fig_dir <- here("report","WD","figures")
+
+knitr::opts_chunk$set(
+  echo=FALSE,
+  warning=FALSE,
+  message=FALSE,
+  fig.align="center"
+)
+```
+
+
+# Historia de la evaluación y del asesoramiento
+
+El boquerón europeo (*Engraulis encrasicolus*) es una especie de vida corta, con crecimiento rápido y una elevada variabilidad interanual del reclutamiento. Estas características se traducen en importantes fluctuaciones en la abundancia del stock y aumentan la incertidumbre asociada a su evaluación y gestión. En este tipo de stocks es especialmente importante reducir, en la medida de lo posible, el desfase entre la recopilación de los datos, la evaluación, el asesoramiento y la implementación de las medidas de gestión, de forma que las decisiones se basen en la información más reciente disponible sobre el estado del stock [@ICES2019WKDLSSLS; @ICES2020WKDLSSLS2].
+
+La evaluación y el asesoramiento científico del boquerón en aguas atlánticas ibéricas se realizan en el marco del ICES Working Group on Southern Horse Mackerel, Anchovy and Sardine (WGHANSA). Desde el benchmark WKPELA de 2018, el marco de evaluación y gestión del boquerón de la División 9.a ha experimentado varios cambios relevantes, tanto en la metodología de evaluación como en la definición del stock, la categoría de asesoramiento y las reglas utilizadas para establecer las capturas [@ICES2018WKPELA; @ICES2018WGHANSA; @ICES2019WGHANSA; @ICES2020WGHANSA; @ICES2021WGHANSA; @ICES2022WGHANSA; @ICES2023WGHANSA] (Figura \@ref(fig:evolution-assessment)).
+
+
+```{r evolution-assessment, fig.cap="Evolución del marco de evaluación y gestión del boquerón de la División 9.a Sur (ane.27.9aS), desde el benchmark WKPELA 2018 y la evaluación basada en Gadget hasta la evaluación SS3 adoptada en WKBANSP y el posterior desarrollo de una MSE para evaluar procedimientos de gestión basados en Fcap–Bescapement.", out.width="90%"}
+if (file.exists(file.path(fig_dir,"Cronología del proceso de evaluación ANE 27.9a.png"))) {
+  knitr::include_graphics(file.path(fig_dir,"Cronología del proceso de evaluación ANE 27.9a.png"))
+}
+```
+
+
+Tras WKPELA 2018 se adoptó una evaluación integrada implementada en Gadget para el boquerón de la División 9.a [@ICES2018WKPELA]. El modelo integraba la información procedente de las campañas acústicas PELAGO y ECOCADIZ con datos trimestrales de la flota de cerco del Golfo de Cádiz. El stock fue inicialmente clasificado como Categoría 1 y se adoptó un ciclo de gestión julio–junio, de forma que el calendario de evaluación y asesoramiento estuviera alineado con la disponibilidad de la información procedente de las campañas [@ICES2018WKPELA; @ICES2018WGHANSA]. Gadget es un marco de modelización estadística diseñado para representar de forma integrada la dinámica de poblaciones y pesquerías [@BegleyHowell2004; @Taylor2007Gadget].
+
+Posteriormente, la incertidumbre asociada a las estimaciones de biomasa absoluta, principalmente debido a la estimación de la capturabilidad de las campañas, generó dudas sobre la fiabilidad del nivel absoluto de biomasa estimado por el modelo. Como consecuencia, el stock fue reclasificado como Categoría 3 y la evaluación Gadget pasó a utilizarse principalmente como indicador de abundancia relativa [@ICES2019WGHANSA; @ICES2020WGHANSA].
+
+Bajo este marco de Categoría 3, el asesoramiento se basó en reglas empíricas para stocks de vida corta, entre ellas la regla 1-over-2 [@ICES2022Cat23Guidance]. Esta regla ajusta la captura recomendada utilizando la relación entre la estimación de biomasa más reciente y la media de las dos estimaciones anteriores, junto con un límite de incertidumbre y una salvaguarda de biomasa. Su aplicación puso de manifiesto la sensibilidad del asesoramiento a las revisiones del indicador de biomasa y las dificultades asociadas a las fuertes fluctuaciones interanuales características de este stock [@ICES2019WGHANSA; @ICES2020WGHANSA; @ICES2021WGHANSA; @ICES2022WGHANSA; @ICES2023WGHANSA].
+
+
+
+# MSE previa para el boquerón de la División 9.a Sur
+
+Las limitaciones del marco de asesoramiento utilizado para el componente sur del
+boquerón de la División 9.a motivaron la evaluación de procedimientos de gestión
+alternativos. En este contexto, dentro del proyecto Math4Fish se desarrolló una
+Management Strategy Evaluation (MSE) específica para ane.27.9aS, en la que se
+comparó la regla 1-over-2 utilizada como base del asesoramiento con procedimientos
+basados en una tasa de explotación constante (*constant harvest rate*, CHR)
+[@Perez2023Math4Fish; @ICES2023WGHANSA].
+
+La MSE se implementó en FLBEIA [@Garcia2017FLBEIA], dentro del marco FLR
+[@Kell2007], utilizando un Modelo Operativo (OM) condicionado a partir de la
+evaluación Gadget disponible en ese momento. El marco de simulación representó
+la dinámica de la población y de la pesquería e incorporó distintas fuentes de
+incertidumbre relevantes para evaluar los procedimientos de gestión, incluyendo
+variabilidad en el reclutamiento y en parámetros biológicos, error de assessment
+y variabilidad en la distribución estacional de las capturas
+[@Perez2023Math4Fish; @ICES2023WGHANSA].
+
+La evaluación se realizó mediante una aproximación *shortcut MSE*, en la que el
+modelo de assessment no se ejecutaba nuevamente dentro de cada ciclo de gestión.
+En su lugar, la incertidumbre asociada a la evaluación se representó mediante un
+modelo de error aplicado a la información del stock utilizada por el procedimiento
+de gestión. De esta forma, se mantuvo la separación entre el estado del stock
+simulado por el OM y el estado percibido utilizado para aplicar la regla de
+control. Esta separación es relevante en una MSE, ya que los errores de evaluación
+pueden afectar al comportamiento y al riesgo asociado a los procedimientos de
+gestión [@Wiedenmann2015; @ICES2019WKNSMSE].
+
+Los resultados identificaron una regla CHR con una tasa de explotación de 0.5 y
+un *biomass safeguard* como una alternativa precautoria a la regla 1-over-2. Bajo
+los escenarios evaluados, esta regla produjo mayores capturas manteniendo el
+riesgo biológico dentro de los criterios considerados y fue posteriormente
+utilizada como base del asesoramiento para el componente sur
+[@Perez2023Math4Fish; @ICES2023WGHANSA].
+
+La MSE desarrollada en el presente trabajo parte de esta experiencia metodológica,
+pero evalúa un procedimiento de gestión diferente. Tras WKBANSP, la evaluación
+Gadget fue sustituida por Stock Synthesis (SS3) y se actualizaron la estructura
+del assessment y los puntos de referencia utilizados para caracterizar el estado
+del stock [@ICES2024WKBANSP]. En consecuencia, el Modelo Operativo se condiciona
+ahora a partir de SS3 y se evalúan procedimientos de gestión definidos mediante
+\(F_{\mathrm{cap}}\) y \(B_{\mathrm{escapement}}\), en lugar de la regla CHR
+evaluada en la MSE anterior.
+
+
+# WKBANSP y transición a un marco de Categoría 1 basado en SS3
+
+El marco de evaluación del boquerón de la División 9.a fue revisado durante el *Benchmark Workshop on anchovy stocks* (WKBANSP) [@ICES2024WKBANSP]. Como resultado del benchmark, el stock de la División 9.a, tratado anteriormente como un único stock con dos componentes (9.aW y 9.aS), fue dividido en dos stocks independientes: ane.27.9aW y ane.27.9aS. Para ane.27.9aS se adoptó una evaluación analítica estructurada por edades implementada en Stock Synthesis (SS3) [@Methot2013], incorporando un índice de reclutamiento derivado de la biomasa de individuos de edad 0 estimada durante la campaña acústica de otoño ECOCADIZ-RECLUTAS. La incorporación de esta información permitió disponer de una estimación actualizada del reclutamiento antes de la emisión del advice y estuvo acompañada por un cambio del calendario de gestión, desde el ciclo julio–junio utilizado anteriormente a un ciclo basado en el año calendario, de enero a diciembre [@ICES2024WKBANSP; @ICES2025WGHANSA]. La nueva evaluación permitió que ane.27.9aS pasara de Categoría 3 a Categoría 1. El assessment SS3 y el forecast de corto plazo constituyen actualmente una base válida para el asesoramiento [@ICES2025WGHANSA].
+
+Para stocks de vida corta de Categoría 1, el marco de ICES contempla una estrategia MSY basada en escapement. Para ane.27.9aS, su aplicación requiere determinar mediante MSE un valor de \(F_{\mathrm{cap}}\) compatible con el criterio precautorio de riesgo a largo plazo [@ICES2024WKBANSP; @ICES2025WGHANSA]:
+
+\[
+P(SSB < B_{\mathrm{lim}}) \leq 0.05.
+\]
+
+Mientras \(F_{\mathrm{cap}}\) no esté definido, la estrategia MSY \(B_{\mathrm{escapement}}\) no puede utilizarse como base del asesoramiento. Por esta razón, los advice de 2025 y 2026 se obtuvieron de forma provisional utilizando el marco de ICES para stocks de vida corta de Categoría 3 y la regla 1-over-2, utilizando la SSB estimada por SS3 como índice de biomasa [@ICES2024WGHANSA; @ICES2025WGHANSA].
+
+La definición de \(F_{\mathrm{cap}}\) y la evaluación del procedimiento de gestión necesario para aplicar la estrategia MSY \(B_{\mathrm{escapement}}\) constituyen, por tanto, la motivación principal de la MSE desarrollada para ane.27.9aS. El desarrollo de este MSE fue programado para su evaluación mediante benchmark en 2026 [@ICES2025WGHANSA].
+
+La estructura del procedimiento de gestión evaluado se basa en \(F_{\mathrm{cap}}\) y \(B_{\mathrm{escapement}}\). \(B_{\mathrm{escapement}}\) define el nivel de biomasa que se pretende preservar antes del desove, mientras que \(F_{\mathrm{cap}}\) establece el límite superior de mortalidad por pesca.
+
+Existen antecedentes recientes para la evaluación mediante MSE de este tipo de estrategias en stocks de vida corta. Trochta et al. (2024) evaluaron diferentes niveles de \(B_{\mathrm{escapement}}\) para el capelán del Mar de Barents utilizando una restricción probabilística sobre la biomasa de escapement. Más recientemente, ICES evaluó para el sprat del Mar del Norte una estrategia que combina \(B_{\mathrm{escapement}}\) y \(F_{\mathrm{cap}}\), proporcionando un antecedente directamente comparable con la estructura evaluada para ane.27.9aS [@ICES2026WKBHERSPRAT].
+
+Para ane.27.9aS, la HCR evaluada combina \(F_{\mathrm{cap}}\) y \(B_{\mathrm{escapement}}\) e incorpora una restricción probabilística sobre la biomasa de escapement. 
+
+
+# Objetivos de la shortcut MSE actual
+
+La Management Strategy Evaluation (MSE) permite comparar procedimientos de gestión alternativos mediante simulación, incorporando las principales fuentes de incertidumbre que pueden afectar tanto a la dinámica del stock como al proceso de evaluación y gestión [@Punt2016; @ICES2020WKGMSE3].
+
+En este trabajo se desarrolla una *shortcut MSE* para ane.27.9aS, actualizando la aproximación utilizada previamente para este stock [@Perez2023Math4Fish] al marco de evaluación SS3 adoptado durante WKBANSP [@ICES2024WKBANSP]. El Modelo Operativo se condiciona a partir de la evaluación SS3 y representa explícitamente la dinámica estacional de la población y de la pesquería.
+
+La aproximación *shortcut* evita ejecutar nuevamente SS3 dentro de cada ciclo de gestión. La incertidumbre asociada al assessment se representa estadísticamente, manteniendo separadas la dinámica verdadera del stock simulada por el Modelo Operativo y la percepción del stock utilizada por el procedimiento de gestión [@Punt2016; @ICES2020WKGMSE3; @Wiedenmann2015].
+
+El objetivo principal es evaluar procedimientos de gestión candidatos definidos por diferentes combinaciones de \(F_{\mathrm{cap}}\) y \(B_{\mathrm{escapement}}\). El criterio biológico principal es que el riesgo de que la SSB verdadera simulada se encuentre por debajo de \(B_{\mathrm{lim}}\) no sea superior al 5 %:
+
+\[
+P(SSB < B_{\mathrm{lim}}) \leq 0.05.
+\]
+
+Para ane.27.9aS, \(B_{\mathrm{lim}} = 4\,721\) t y \(B_{\mathrm{pa}} = 6\,561\) t [@ICES2024WKBANSP; @ICES2025StockAnnex9aS]. \(B_{\mathrm{escapement}}\) constituye un parámetro del procedimiento de gestión y debe distinguirse de estos puntos de referencia biológicos.
+
+Además del riesgo biológico, el desempeño de los procedimientos de gestión se evalúa mediante métricas relacionadas con el rendimiento y la estabilidad de la pesquería, incluyendo la captura, su variabilidad interanual y la frecuencia de cierres [@Punt2016; @ICES2020WKGMSE3; @ICES2026WKBHERSPRAT].
+
+**Los Working Documents siguientes describen el condicionamiento del Modelo Operativo, la representación del reclutamiento y sus incertidumbres, la dinámica estacional de la pesquería, la implementación del procedimiento de gestión y la evaluación de los candidate MPs.**
+
+# References
+

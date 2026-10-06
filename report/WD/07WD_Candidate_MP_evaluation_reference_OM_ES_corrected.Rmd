@@ -1,0 +1,724 @@
+---
+title: "Evaluación y selección de MPs candidatos bajo REF para ane.27.9aS"
+author: ""
+date: "`r format(Sys.Date(), '%d-%m-%Y')`"
+
+output:
+  bookdown::pdf_document2:
+    toc: false
+    toc_depth: 3
+    number_sections: true
+    keep_tex: false
+
+bibliography: report_biblio.bib
+csl: ices-journal-of-marine-science.csl
+link-citations: true
+
+header-includes:
+- \usepackage{adjustbox}
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(here)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+scenario_dir <- here("data","mse","scenarios")
+performance_dir <- here("data","mse","performance")
+validation_dir <- here("outputs","mse","validation")
+diagnostic_dir <- here("outputs","mse","diagnostics")
+selection_dir <- here("outputs","mse","candidate_MP_selection")
+figure_dir <- here("outputs","mse","candidate_MPs")
+table_dir <- file.path(figure_dir,"tables")
+
+knitr::opts_chunk$set(
+  echo=FALSE,
+  message=FALSE,
+  warning=FALSE,
+  fig.align="center",
+  out.width="95%"
+)
+
+required_csv <- function(...) {
+  path <- here::here(...)
+  if (!file.exists(path)) stop("Required WD07 table not found: ", path)
+  read.csv(path, stringsAsFactors=FALSE, check.names=FALSE)
+}
+
+fmt <- function(x, digits=1) formatC(x, format="f", digits=digits)
+pct <- function(x, digits=1) fmt(100*x, digits)
+
+initial <- required_csv("data", "mse", "performance", "candidate_MP_performance_full.csv")
+refined <- required_csv("data", "mse", "performance_refined", "refined_candidate_MP_performance_full.csv")
+initial_h <- required_csv("data", "mse", "performance", "candidate_MP_performance_by_horizon.csv")
+refined_h <- required_csv("data", "mse", "performance_refined", "refined_candidate_MP_performance_by_horizon.csv")
+validation <- required_csv("outputs", "mse", "validation", "21_MP_validation_by_scenario.csv")
+refined_validation <- required_csv("data", "mse", "performance_refined", "refined_candidate_MP_validation.csv")
+selected <- required_csv("outputs", "mse", "candidate_MP_selection", "robustness", "Table25_02_MPs_selected_for_robustness.csv")
+blim_check <- required_csv("data", "mse", "diagnostics", "Blim_method_sensitivity", "Blim_global_threshold_summary.csv")
+stopifnot(nrow(initial)==20L, nrow(refined)==28L, nrow(selected)==12L,
+          nrow(initial_h)==80L, nrow(refined_h)==112L,
+          all(validation$structural_PASS), nrow(refined_validation)==140L,
+          all(refined_validation$n==30000L),
+          all(refined_validation$n_NA==0L),
+          all(refined_validation$n_nonfinite==0L),
+          all(refined_validation$n_negative==0L),
+          !anyDuplicated(initial$scenario_id), !anyDuplicated(refined$scenario_id),
+          all(selected$scenario_id %in% refined$scenario_id))
+annual_refined <- required_csv("data", "mse", "performance_refined", "refined_candidate_MP_annual_metrics.csv") %>%
+  filter(horizon=="Full", scenario_id %in% selected$scenario_id)
+hcr_states <- required_csv("outputs", "mse", "diagnostics_refined", "21d_HCR_operating_state_summary.csv")
+closure_persistence <- required_csv("outputs", "mse", "diagnostics_refined", "21d_closure_persistence_and_switching.csv")
+stopifnot(nrow(annual_refined)==360L)
+
+performance_table <- function(x, caption, show_id=FALSE) {
+  x <- x[order(x$Fcap, x$Besc), ]
+  out <- data.frame(Fcap=fmt(x$Fcap,2), Besc=x$Besc,
+                    `Riesgo (%)`=pct(x$max_P_Blim),
+                    `Ever (%)`=pct(x$P_ever_Blim),
+                    `Captura`=fmt(x$mean_catch,0),
+                    `Cierre (%)`=pct(x$mean_P_closed),
+                    IAV=fmt(x$median_IAV,2), check.names=FALSE)
+  if (show_id) out <- cbind(MP=x$scenario_number, out)
+  knitr::kable(out, caption=caption, booktabs=TRUE, longtable=TRUE)
+}
+```
+
+# Objetivo y alcance
+
+Este Working Document (WD) documenta la evaluación *closed-loop* de los **candidate Management Procedures (MPs)** definidos para el shortcut Management Strategy Evaluation (MSE) de boquerón del Golfo de Cádiz (ane.27.9aS). El WD continúa directamente la etapa de formulación y validación del MP $F_{cap}$--$B_{esc}$, documentada en el WD anterior, y evalúa las consecuencias de las combinaciones candidatas de parámetros de gestión cuando se aplican repetidamente al ensemble del Operating Model (OM) de referencia.
+
+El WD anterior definió un espacio factorial inicial de 20 candidate MPs a partir de cinco valores de $F_{cap}$,
+
+$$
+F_{cap}=
+\{1.00,\;1.25,\;1.50,\;1.75,\;2.00\},
+$$
+
+y cuatro valores de $B_{esc}$,
+
+$$
+B_{esc}=
+\{5000,\;6561,\;8000,\;10000\}\ {\rm t}.
+$$
+
+La formulación probabilística de la HCR, la proyección estacional de corto plazo, la caracterización de la forecast uncertainty y los diagnósticos utilizados para delimitar este espacio candidato se documentaron previamente y no se reevalúan aquí. En particular, la distribución empírica de forecast uncertainty adoptada en el WD anterior forma parte de la configuración de referencia de la HCR y no constituye una dimensión adicional de robustness en esta etapa.
+
+El objetivo de este WD es evaluar el grid inicial de 20 MPs, documentar su refinamiento a 28 alternativas y justificar el conjunto de 12 MPs transferido a pruebas de robustez. Las comparaciones de robustez se documentan separadamente en WD08. Las comparaciones mantienen emparejadas las trayectorias entre alternativas de gestión. La evaluación se organiza en cuatro componentes diferenciados:
+
+1. comprobación de la integridad estructural y operacional de las simulaciones *closed-loop*;
+2. diagnóstico de las dinámicas biológicas y pesqueras generadas por los candidate MPs;
+3. cuantificación de su desempeño mediante métricas de riesgo biológico, cierres, captura y variabilidad interanual;
+4. evaluación de las consecuencias de los MPs bajo el Reference OM antes de definir el conjunto que será transferido a robustness testing.
+
+Esta separación distingue los **controles de implementación**, utilizados para verificar que las simulaciones se ejecutaron de acuerdo con el diseño previsto, de los **diagnósticos de dinámica**, utilizados para inspeccionar el comportamiento del sistema, y de las **métricas de performance**, utilizadas para comparar las consecuencias de las alternativas de gestión.
+
+La etapa documentada puede representarse como
+
+$$
+\text{candidate MPs}
+\rightarrow
+\text{closed-loop MSE}
+\rightarrow
+\text{implementation checks}
+\rightarrow
+\text{dynamic diagnostics}
+\rightarrow
+\text{performance evaluation}
+\rightarrow
+\text{Reference-OM screening}
+\rightarrow
+\text{candidate refinement}.
+$$
+
+El período histórico del OM comprende 1989--2024 y la proyección *closed-loop* se realiza entre 2025 y 2054. El diseño utiliza 100 OMs condicionados, cada uno replicado mediante 10 realizaciones estocásticas, dando lugar a 1,000 trayectorias por candidate MP. Cada alternativa de gestión se evalúa sobre el mismo ensemble y conserva el emparejamiento de OM, réplica, assessment error y forecast uncertainty entre escenarios.
+
+Este WD07 continúa la secuencia iniciada en los **WDs01--03**, que construyen el sistema población--reclutamiento--pesquería, y continuada en el **WD04**, que comprueba su funcionamiento open-loop. El **WD05** aporta el emulador de assessment error y el **WD06** la regla probabilística validada y el grid inicial de 20 MPs. La pregunta aquí es **qué consecuencias producen las alternativas de gestión cuando se aplican repetidamente y qué conjunto se transfiere a la evaluación de robustez del WD08**.
+
+## Relación con la evaluación de reglas de escapamiento de IMR–PINRO
+
+El [informe IMR–PINRO 2024-17](https://www.hi.no/hi/nettrapporter/imr-pinro-en-2024-17) sirve como referencia para separar evaluación de referencia, consecuencias pesqueras y pruebas de robustez. Su riesgo máximo utiliza un subconjunto común de años con apertura suficiente; aquí se conserva el máximo sobre todos los años del horizonte. Sus resúmenes temporales usan medianas; aquí se mantienen las medias temporales definidas en el script 22. Por tanto, los indicadores no son numéricamente intercambiables.
+
+La historia de este WD responde, en orden, a cuatro preguntas: ¿son válidas las simulaciones?, ¿cumplen los MPs el criterio biológico?, ¿qué implican para captura y continuidad de la pesca?, y ¿qué alternativas conviene llevar a robustez? La sensibilidad de Blim responde a la segunda pregunta y antecede a la selección.
+
+# Métodos
+
+## Diseño de evaluación bajo el Reference Operating Model
+
+### Candidate Management Procedures
+
+Los 20 candidate MPs definidos en el WD anterior constituyen el input de esta etapa. Cada MP está identificado por una combinación única de $F_{cap}$ y $B_{esc}$. No se modifican simultáneamente otros componentes del OM o del MP durante esta comparación.
+
+El diseño inicial corresponde al producto factorial
+
+$$
+5\;F_{cap}\times4\;B_{esc}=20\ {\rm candidate\ MPs}.
+$$
+
+Para todos los candidate MPs se mantienen constantes los puntos de referencia biológicos utilizados en el MSE:
+
+$$
+B_{lim}=4721\ {\rm t},
+$$
+
+$$
+B_{pa}=6561\ {\rm t}.
+$$
+
+El criterio de riesgo utilizado posteriormente para evaluar la probabilidad de encontrarse por debajo de $B_{lim}$ se fija en
+
+$$
+\alpha_{\rm risk}=0.05.
+$$
+
+Las combinaciones de $F_{cap}$ y $B_{esc}$, junto con los parámetros que definen la configuración común del Reference OM, se almacenan en `candidate_MP_grid.csv`. Este archivo constituye la tabla maestra de escenarios utilizada tanto para ejecutar las simulaciones como para recuperar posteriormente la identidad y configuración de cada candidate MP.
+
+### Configuración común del Reference OM
+
+Todos los candidate MPs se evalúan inicialmente bajo la misma configuración del Reference OM. Esta condición permite atribuir las diferencias entre escenarios a los parámetros del MP y no a cambios simultáneos en las hipótesis del OM.
+
+La configuración de referencia conserva los componentes del shortcut MSE documentados en los WDs anteriores. Los parámetros de la relación stock--recruit se mantienen específicos de cada OM. El error de proceso del reclutamiento utiliza una desviación estándar logarítmica común de referencia, aproximadamente $\sigma_R=0.216$; el valor redondeado de las etiquetas de escenarios no sustituye al input utilizado para ejecutar las simulaciones.
+
+El reparto estacional de capturas del OM procede de los inputs condicionados de cada OM, correspondientes a los últimos diez años. El script 20 conserva esas proporciones en `fleets.ctrl$seasonal.share`. El vector $(0.138,0.417,0.334,0.111)$ de la tabla de escenarios es metadata de explotación de referencia y **no sobrescribe** los repartos condicionados del OM. Por separado, el MP estima las proporciones estacionales de F mediante `get_Fprop`, con `nFyears=5`. Las proporciones de F del forecast y las proporciones de reparto de capturas de la pesquería representan componentes distintos.
+
+El assessment error histórico se aplica a SSB y F del stock percibido, sin modificar directamente el estado verdadero del OM; no se añade assessment error al reclutamiento. La simulación tampoco reestima un assessment SS3 completo cada año.
+
+La forecast uncertainty de la HCR corresponde a la distribución empírica S2 derivada de los assessments bootstrap contemporáneos. A cada trayectoria global se asigna un forecast CV que se conserva entre MPs y años. En la evaluación inicial y refinada, S2 es parte de la configuración común del MP. Su modificación se examina posteriormente en los escenarios de información I0 e I1, cuyos resultados todavía no se presentan aquí.
+
+### Ensemble de simulación y estructura de las trayectorias
+
+El ensemble está compuesto por 100 OMs condicionados. Cada OM se expande mediante 10 realizaciones estocásticas del período de proyección, produciendo
+
+$$
+100\ {\rm OMs}\times10\ {\rm replicates}
+=
+1000\ {\rm trajectories}
+$$
+
+por candidate MP.
+
+Cada trayectoria se identifica mediante tres índices relacionados:
+
+- `iter1000`: identificador global de la trayectoria, entre 1 y 1,000;
+- `om`: identificador del OM condicionado, entre 1 y 100;
+- `replicate`: realización estocástica dentro del OM, entre 1 y 10.
+
+La combinación `om × replicate` es única dentro de cada candidate MP. La misma estructura se utiliza para todas las alternativas de gestión, de forma que una trayectoria determinada representa la misma combinación de OM y réplica entre candidate MPs.
+
+Las 1,000 trayectorias se ejecutan en 10 bloques de 100 trayectorias. Cada bloque genera el objeto MSE correspondiente y un mapa que relaciona las iteraciones locales del bloque con `iter1000`, `om` y `replicate`. Esta estructura permite ejecutar el ensemble por bloques sin perder la correspondencia global entre trayectorias.
+
+### Emparejamiento de forecast uncertainty
+
+La forecast uncertainty se empareja explícitamente con las trayectorias del MSE mediante un mapa maestro. A cada `iter1000` se asigna un único valor de forecast CV extraído con reemplazo de la distribución empírica S2.
+
+La asignación se genera reproduciblemente utilizando
+
+```{r forecast-cv-seed, echo=TRUE, eval=FALSE}
+forecast_CV_seed <- 20260923
+```
+
+y permanece fija durante todo el período de proyección de una
+trayectoria. El mismo emparejamiento `iter1000`--forecast CV se utiliza
+para todos los candidate MPs.
+
+Este diseño evita que las diferencias entre MPs se deban a realizaciones
+distintas de forecast uncertainty y permite comparar alternativas de
+gestión bajo condiciones estocásticas emparejadas.
+
+### Período de proyección
+
+Las simulaciones conservan el período histórico condicionado 1989--2024
+y ejecutan el ciclo de gestión durante
+
+$$
+2025\text{--}2054.
+$$
+
+Cada trayectoria contiene, por tanto, 30 años de proyección
+*closed-loop*. Durante este período, el MP genera anualmente advice de F
+y TAC, la pesquería implementa dicho advice dentro de FLBEIA y el OM
+avanza al año siguiente incorporando la dinámica poblacional y el error
+de proceso correspondiente.
+
+La evaluación de performance se realiza tanto para el período completo
+como para tres horizontes de diez años:
+
+  Horizonte   Período
+  ----------- ------------
+  Short       2025--2034
+  Medium      2035--2044
+  Long        2045--2054
+  Full        2025--2054
+
+Los mismos límites temporales se aplican a todos los candidate MPs.
+
+## Ejecución closed-loop de los candidate MPs
+
+### Ciclo anual de simulación
+
+Cada candidate MP se ejecuta mediante la misma arquitectura
+*closed-loop* en FLBEIA [@Garcia2017FLBEIA]. El estado verdadero del OM
+genera la información utilizada para construir el stock observado y,
+posteriormente, el stock percibido por el MP. La HCR probabilística
+$F_{cap}$--$B_{esc}$, documentada y validada en el WD anterior, utiliza
+este estado para generar el advice correspondiente al año siguiente.
+
+Para cada ciclo anual, el flujo general es
+
+$$
+OM_t
+\rightarrow
+Observation_t
+\rightarrow
+Perceived\ stock_t
+\rightarrow
+Forecast_{t+1}
+\rightarrow
+HCR
+\rightarrow
+(F_{adv,t+1},TAC_{t+1})
+\rightarrow
+Fishery_{t+1}
+\rightarrow
+OM_{t+1}.
+$$
+
+La simulación no reestima un assessment estadístico completo dentro de
+cada ciclo. En su lugar, el assessment error previamente caracterizado
+modifica el estado percibido utilizado por el MP. De forma
+independiente, la forecast uncertainty entra en la evaluación
+probabilística del forecast utilizada por la HCR.
+
+Para cada año y trayectoria, la HCR puede generar una de tres respuestas
+operacionales previamente documentadas:
+
+-   aplicación de $F_{cap}$;
+-   reducción de F por debajo de $F_{cap}$;
+-   cierre, representado por $F_{adv}=0$.
+
+El $F_{adv}$ seleccionado se transforma en TAC mediante la proyección
+estacional y la ecuación de captura de Baranov documentadas en el WD
+anterior. El TAC se transfiere posteriormente al componente pesquero de
+FLBEIA, que determina la captura realizada dentro del OM.
+
+### Outputs del closed-loop
+
+Para cada candidate MP y trayectoria se conservan las variables
+necesarias para evaluar tanto el estado biológico como las consecuencias
+pesqueras. Las variables principales utilizadas en este WD son:
+
+-   reclutamiento de edad 0 en Q3;
+-   SSB al inicio de Q2;
+-   captura realizada anual;
+-   TAC anual;
+-   $F_{adv}$ anual.
+
+Estas variables se extraen para cada año de 2025--2054 manteniendo los
+identificadores `iter1000`, `om` y `replicate`.
+
+La evaluación formal de estas simulaciones se realiza únicamente después
+de comprobar la integridad del ensemble y la correspondencia entre los
+outputs, los mapas de iteraciones y la configuración de cada candidate
+MP.
+
+
+## Validación y diagnóstico de las simulaciones
+
+El script 21 verifica bloques, mapas, años, dimensiones, correspondencia de OM y réplica, forecast CV y variables extraídas. Cada MP debe aportar diez bloques y 1,000 trayectorias únicas, con 100 OMs y diez réplicas por OM. Se comprueba que $0\leq F_{adv}\leq F_{cap}$ y que las variables utilizadas son finitas y no negativas. El script 21c extiende los controles a los nuevos MPs del grid refinado; el evaluador 22b vuelve a comprobar las variables extraídas para los 28 MPs.
+
+Los scripts 21b y 21d describen las dinámicas del grid inicial y refinado, respectivamente: SSB, reclutamiento, captura, TAC, estados de la HCR, persistencia de cierres y trayectorias extremas. Estas inspecciones complementan el cálculo de performance; no sustituyen el criterio de riesgo.
+
+La razón anual captura/TAC se evalúa cuando TAC es positivo. Una diferencia relativa superior al 5% genera una **señal diagnóstica**, no un fallo estructural automático. El TAC calculado por el MP y la captura realizada pueden diferir por la dinámica del OM, la asignación estacional y los límites de implementación. Cuando TAC es muy pequeño, una diferencia pequeña en toneladas puede superar ese umbral relativo.
+
+## Métricas de desempeño y criterio de riesgo
+
+Para cada horizonte $H$ y año $t$, la probabilidad anual de estar por debajo de $B_{lim}$ es
+
+$$
+P_{Blim}(t)=\frac{1}{1000}\sum_{i=1}^{1000}
+\mathbf{1}\{SSB_{i,t,Q2}<4721\}.
+$$
+
+Este riesgo se calcula sobre la SSB realizada del OM. Es distinto del riesgo de forecast respecto de $B_{esc}$ que utiliza internamente la HCR del WD06.
+
+La métrica principal es $\max_{t\in H}P_{Blim}(t)$. Se compara con el umbral del 5%. El screening inicial del script 24 usa una desigualdad estricta; la selección y las comparaciones posteriores usan $\leq0.05$. Ningún resultado presentado está en esa frontera, por lo que esta diferencia no afecta a la clasificación actual.
+
+La probabilidad de estar alguna vez por debajo del límite es una métrica diferente:
+
+$$
+P_{ever,Blim}(H)=\frac{1}{1000}\sum_{i=1}^{1000}
+\mathbf{1}\{\min_{t\in H}SSB_{i,t,Q2}<4721\}.
+$$
+
+Las mismas métricas se calculan para $B_{pa}=6561$ t. La probabilidad acumulada en 30 años no se compara con el umbral del 5% definido para el riesgo anual máximo.
+
+Un año cerrado se identifica mediante $F_{adv}\leq10^{-8}$. `mean_P_closed` es la media de las probabilidades anuales de cierre; equivale a la proporción de observaciones año--trayectoria cerradas. `P_ever_closed` es la proporción de trayectorias con al menos un cierre. Una probabilidad de experimentar algún cierre cercana a uno no significa que todos los años estén cerrados.
+
+La captura media anual incluye los años cerrados. Primero se calcula la media temporal de cada trayectoria y después la media entre las 1,000 trayectorias, con igual peso. La captura condicional a años abiertos se calcula por trayectoria y se resume entre las trayectorias que tienen al menos un año abierto; su población de referencia es distinta.
+
+La variabilidad interanual se calcula como
+
+$$
+IAV_{i,t}=\frac{|C_{i,t}-C_{i,t-1}|}{(C_{i,t}+C_{i,t-1})/2}.
+$$
+
+Si ambas capturas son cero se asigna cero; una transición entre cero y una captura positiva produce un valor de dos. Se promedian los pasos dentro de cada trayectoria y horizonte, excluyendo el primer año de cada horizonte, y se presenta la mediana entre trayectorias. IAV es adimensional y está entre cero y dos. Los cierres consecutivos pueden reducir este indicador sin representar una mejora de la continuidad de la actividad pesquera.
+
+Los resultados Short, Medium, Long y Full se conservan por separado. Los cuantiles de captura y las diferencias emparejadas entre trayectorias describen la dispersión simulada; no son intervalos de confianza de las medias. Las diez réplicas de cada OM comparten su acondicionamiento y los mismos identificadores se repiten entre MPs.
+
+### Alcance de los indicadores de escapamiento
+
+$B_{esc}$ es el objetivo de la decisión y $B_{lim}$ es el umbral de evaluación biológica. Los outputs presentados permiten evaluar riesgo respecto de Blim y Bpa; no contienen una serie anual de probabilidades de SSB realizada por debajo del Besc particular de cada MP. Esa probabilidad no se sustituye por el riesgo interno del forecast. Su incorporación requeriría calcularla desde las trayectorias anuales y conservarla como un indicador adicional, sin cambiar el criterio vigente.
+
+## Diagnósticos adicionales del Reference OM
+
+El script 22b de sensibilidad de $B_{lim}$ aplica umbrales alternativos a las mismas trayectorias. Es un diagnóstico de la clasificación del riesgo y no cambia el $B_{lim}$ del advice ni vuelve a ejecutar los MPs. El diagnóstico del reclutamiento realizado, sus secuencias bajas y su asociación con SSB del script 22c se presenta en WD02, junto a la especificación del proceso que lo genera. Se ejecuta sobre las corridas closed-loop, aunque se documenta allí por componente científico; aquí se utiliza como contexto para interpretar el riesgo.
+
+# Resultados bajo el Reference OM
+
+## Integridad del grid inicial
+
+Los 20 MPs aportan 200 bloques, 1,000 trayectorias por MP y 30 años de proyección, equivalentes a 600,000 observaciones MP--año--trayectoria. Todos los controles estructurales del script 21 son satisfactorios. El forecast CV asignado varía aproximadamente entre 0.224 y 0.432, con mediana 0.298, y coincide con el mapa maestro en todos los MPs.
+
+Se registran `r sum(validation$n_TAC_flags)` señales captura/TAC superiores al 5%. Estas señales se conservan como diagnósticos de implementación y no invalidan por sí solas los controles estructurales.
+
+## Desempeño del grid inicial
+
+```{r initial-performance}
+performance_table(initial, "Desempeño de los 20 MPs iniciales bajo REF, 2025--2054.")
+```
+
+En las tablas de desempeño, «riesgo» es el máximo anual de $P_{Blim}$; «Ever» es la probabilidad de estar alguna vez por debajo de $B_{lim}$ durante el horizonte; «cierre» es la proporción media de años cerrados. Se expresan como porcentajes. La captura se expresa en t/año e incluye los años de cierre; IAV es la mediana del indicador por trayectoria.
+
+Los 20 MPs cumplen el criterio de riesgo anual. El valor máximo del grid es `r pct(max(initial$max_P_Blim))`%, muy inferior al 5%. Este resultado describe el ensemble y las hipótesis de REF; no demuestra protección frente a todas las fuentes posibles de incertidumbre.
+
+A $B_{esc}$ fijo, aumentar $F_{cap}$ eleva la captura media pero también aumenta la frecuencia de cierres. Por ejemplo, para $B_{esc}=5000$ t, la captura pasa de aproximadamente 4,866 a 6,281 t/año entre $F_{cap}=1$ y 2, mientras que los cierres pasan del 13.5 al 25.2% de los años. Los incrementos sucesivos de captura por cada aumento de 0.25 en $F_{cap}$ disminuyen de aproximadamente 501 a 241 t/año.
+
+Para $B_{esc}=10000$ t, los cierres representan aproximadamente el 84.6--86.0% de los años y la captura media queda entre 1,581 y 2,215 t/año. Su IAV relativamente bajo debe interpretarse junto con la persistencia de cierres: asignar cero a dos años consecutivos sin captura reduce el indicador. Este nivel de escapement aporta un contraste conservador al diagnóstico inicial, pero no se conserva en el grid refinado.
+
+El screening del script 24 deja elegibles los 20 MPs. Por tanto, el criterio biológico no establece un ranking único; la comparación posterior considera conjuntamente rendimiento, cierres, variabilidad y dispersión entre trayectorias.
+
+
+## Captura y biomasa cuando la pesquería abre
+
+Para interpretar el rendimiento se presentan juntos los resultados que incluyen cierres y los condicionados a años abiertos. Los primeros describen la captura que cabe esperar durante todo el horizonte; los segundos describen la actividad cuando el MP permite pescar. Un rendimiento alto en años abiertos puede coexistir con cierres frecuentes. Las trayectorias sin apertura se excluyen solamente del resumen condicional y su número queda visible.
+
+El script `23_PLOT_CANDIDATE_MPS_FINAL.R` calcula sus resúmenes gráficos desde las métricas por trayectoria del script 22. La figura siguiente utiliza los cuantiles ya exportados del grid inicial: cada punto es la mediana entre trayectorias de sus medias temporales en años abiertos. Las líneas representan percentiles 5--95, no intervalos de confianza ni una nueva definición de performance.
+
+```{r open-fishery-tradeoff, fig.width=9, fig.height=6, fig.cap="Grid inicial: relación entre SSB y captura en años abiertos. Medianas y percentiles 5--95 entre trayectorias con apertura; el color identifica Fcap y las etiquetas Besc."}
+ggplot(initial, aes(x=median_mean_SSB_open, y=median_mean_catch_open, colour=factor(Fcap))) +
+  geom_segment(aes(x=p05_mean_SSB_open, xend=p95_mean_SSB_open, yend=median_mean_catch_open), alpha=0.4) +
+  geom_segment(aes(y=p05_mean_catch_open, yend=p95_mean_catch_open, xend=median_mean_SSB_open), alpha=0.4) +
+  geom_point(size=2) +
+  geom_text(aes(label=Besc), vjust=-0.7, size=2.6, check_overlap=TRUE) +
+  labs(x="SSB media en años abiertos (t)", y="Captura media en años abiertos (t)", colour="Fcap") +
+  theme_bw()
+```
+
+```{r open-fishery-population}
+knitr::kable(initial %>% arrange(Fcap,Besc) %>% transmute(Fcap, Besc, `Trayectorias con apertura`=n_trajectories_open, `Captura todos los años (t)`=round(mean_catch), `Captura años abiertos (t)`=round(mean_catch_open)), caption="Población de referencia de los indicadores de captura: grid inicial, horizonte completo.", booktabs=TRUE, longtable=TRUE)
+```
+
+## Diagnóstico temporal del ensemble seleccionado
+
+Las figuras siguientes muestran los doce MPs transferidos a robustez dentro del grid refinado. Los resúmenes anuales conservan los 1,000 miembros del ensemble; las bandas P05--P95 describen variación entre trayectorias y no intervalos de confianza de la mediana.
+
+```{r ref-ssb-dynamics, fig.height=8, fig.cap="SSB de Q2 realizada bajo REF en los doce MPs seleccionados. Línea: mediana anual; banda: percentiles 5 y 95 entre trayectorias. Líneas horizontales: Blim (discontinua) y Bpa (punteada)."}
+ggplot(annual_refined, aes(year, SSB_median)) +
+  geom_ribbon(aes(ymin=SSB_p05, ymax=SSB_p95), fill="#9ecae1", alpha=0.55) +
+  geom_line(colour="#08519c", linewidth=0.55) +
+  geom_hline(yintercept=4721, linetype="dashed", colour="#b2182b") +
+  geom_hline(yintercept=6561, linetype="dotted", colour="#636363") +
+  facet_grid(Fcap ~ Besc, labeller=label_both) +
+  labs(x="Año", y="SSB Q2 (t)") + theme_bw(base_size=11)
+```
+
+Los límites biológicos se comparan con la distribución completa. Una mediana o un P05 por encima de Blim no significa que ninguna trayectoria lo cruce; las probabilidades anuales siguientes utilizan todas las observaciones.
+
+```{r ref-annual-risk, fig.height=5, fig.cap="Probabilidad anual realizada de SSB por debajo de Blim bajo REF. Colores: Fcap; paneles: Besc. El criterio de aceptación es 5%, superior al rango observado en estos MPs."}
+ggplot(annual_refined, aes(year, 100*P_Blim, colour=factor(Fcap))) +
+  geom_line(linewidth=0.6) + facet_wrap(~ Besc, ncol=2, labeller=label_both) +
+  labs(x="Año", y="P(SSB < Blim) (%)", colour="Fcap") +
+  scale_colour_brewer(palette="Dark2") + theme_bw(base_size=11)
+```
+
+Esta figura identifica los años de riesgo sin sustituirlos por una probabilidad acumulada de 30 años. Las diferencias pequeñas en porcentajes deben interpretarse en relación con el tamaño de 1,000 trayectorias: 0.1 puntos porcentuales corresponde a una trayectoria en un año.
+
+```{r ref-catch-closures, fig.height=7, fig.cap="Captura media anual y probabilidad anual de cierre bajo REF. Las capturas incluyen los años cerrados; los paneles separan las métricas y los niveles de Besc."}
+ref_fishery <- annual_refined %>%
+  transmute(year, Fcap, Besc, `Captura (t/año)`=mean_catch,
+            `Probabilidad de cierre (%)`=100*P_closed) %>%
+  pivot_longer(cols=c(`Captura (t/año)`, `Probabilidad de cierre (%)`),
+               names_to="metric", values_to="value")
+ggplot(ref_fishery, aes(year, value, colour=factor(Fcap))) +
+  geom_line(linewidth=0.6) + facet_grid(metric ~ Besc, scales="free_y") +
+  labs(x="Año", y=NULL, colour="Fcap") +
+  scale_colour_brewer(palette="Dark2") + theme_bw(base_size=11)
+```
+
+Los cierres son una respuesta de la HCR al estado percibido y al requisito de escapement. Su frecuencia anual no identifica por sí sola si los mismos miembros permanecen cerrados varios años; ese aspecto se examina mediante la duración de las secuencias de cierre.
+
+```{r ref-closure-persistence, fig.height=5, fig.cap="Duración de las secuencias de cierre del grid refinado. Se muestran la mediana y el P95 de la duración de las rachas identificadas por el diagnóstico 21d; no son cuantiles de captura ni de riesgo."}
+ggplot(closure_persistence, aes(Fcap, median_closure_duration, colour=factor(Besc))) +
+  geom_line(linewidth=0.6) + geom_point() +
+  geom_line(aes(y=p95_closure_duration), linetype="dashed", linewidth=0.6) +
+  labs(x="Fcap", y="Duración de la secuencia (años)", colour="Besc (t)") +
+  scale_colour_brewer(palette="Dark2") + theme_bw(base_size=11)
+```
+
+La línea continua describe la racha mediana y la discontinua su P95. Se trata de resúmenes de los episodios de cierre registrados; las trayectorias sin cierres no aportan episodios a esa distribución. Estos resultados complementan `mean_P_closed` y `P_ever_closed`.
+
+## ¿Depende el bajo riesgo del valor adoptado de Blim?
+
+El riesgo anual de REF es muy bajo en las alternativas exploradas. Este resultado motivó el análisis de `22b_DIAGNOSE_BLIM_METHOD_SENSITIVITY.R`: **comprobar si la escasa probabilidad de cruzar Blim era consecuencia de la posición relativamente baja del umbral adoptado respecto de la distribución de SSB simulada**. El diagnóstico no presupone que el riesgo sea exactamente cero ni que todos los MPs tengan consecuencias equivalentes.
+
+Se retuvieron las mismas trayectorias del grid inicial de 20 MPs y se recalculó la clasificación de biomasa con umbrales derivados mediante
+
+$$
+B_{lim}(\sigma_B)=6561\exp(-1.645\sigma_B),
+\qquad \sigma_B\in\{0.30,0.20,0.10\}.
+$$
+
+La cantidad $\sigma_B$ pertenece al método diagnóstico de derivación del umbral y **no es** $\sigma_R$ del error de proceso del reclutamiento. Se añadió 6,561 t como umbral superior diagnóstico, denominado `Bpa_Bloss` en el script. Estos valores no sustituyen los puntos de referencia operacionales ni se imponen al advice. La comparación cambia el umbral utilizado para contar cruces sobre las mismas SSB realizadas; no modifica Besc, los CVs ni los bloques simulados.
+
+```{r blim-sensitivity}
+bt <- data.frame(Umbral=blim_check$threshold_id,
+                 `Biomasa (t)`=fmt(blim_check$threshold,0),
+                 `Máximo riesgo anual (%)`=pct(blim_check$max_risk_across_MPs),
+                 `MPs con algún cruce`=blim_check$n_MPs_with_any_risk,
+                 `MPs sobre 5%`=blim_check$n_MPs_above_5pct,check.names=FALSE)
+knitr::kable(bt, caption="Sensibilidad del riesgo realizado al umbral biológico en los mismos 20 MPs iniciales.", booktabs=TRUE)
+```
+
+El umbral calculado con $\sigma_B=0.20$ es 4,721.58 t; la HCR y la evaluación adoptan 4,721 t. Al elevar el umbral hasta aproximadamente 5,566 t y 6,561 t, el máximo riesgo anual entre MPs aumenta de 0.8% a 1.8% y 2.5%, respectivamente. Todos los MPs presentan algún cruce de los dos umbrales más altos, pero ninguno supera el criterio anual del 5%.
+
+```{r blim-risk-threshold-response, fig.height=6, fig.cap="Máximo anual de la probabilidad de SSB bajo cada umbral diagnóstico. Cada línea corresponde a un MP del grid inicial; colores: Fcap; paneles: Besc. Se reutilizan las mismas trayectorias. Línea horizontal: criterio anual del 5%."}
+blim_detail <- required_csv("data", "mse", "diagnostics", "Blim_method_sensitivity", "Blim_diagnostic_full.csv")
+ggplot(blim_detail, aes(threshold, 100*max_annual_P_below,
+                       group=scenario_id, colour=factor(Fcap))) +
+  geom_line(linewidth=0.6) + geom_point(size=1.8) +
+  geom_hline(yintercept=5, linetype="dashed", colour="#636363") +
+  facet_wrap(~Besc, ncol=2, labeller=label_both) +
+  labs(x="Umbral diagnóstico de SSB (t)", y="Máximo riesgo anual (%)", colour="Fcap") +
+  scale_colour_brewer(palette="Dark2") + theme_bw(base_size=11)
+```
+
+La respuesta confirma que el umbral influye en la frecuencia contada, pero **el valor bajo de Blim no explica por sí solo el cumplimiento general del criterio**: el riesgo permanece por debajo del 5% incluso al utilizar el umbral superior de 6,561 t. Esta conclusión es diagnóstica y se limita al ensemble REF, sin establecer que cualquier umbral o hipótesis alternativa daría el mismo resultado.
+
+```{r blim-lower-tail-position, fig.height=6, fig.cap="Posición de la cola inferior anual de SSB respecto de los umbrales diagnósticos. Para cada MP se muestra el mínimo temporal del P01 y P05 anual entre trayectorias. Líneas horizontales: cuatro umbrales; la etiqueta identifica los extremos P01/P05."}
+ssb_tail <- required_csv("data", "mse", "diagnostics", "Blim_method_sensitivity", "SSB_lower_tail_full.csv")
+tail_long <- ssb_tail %>% select(Fcap, Besc, min_annual_q01, min_annual_q05) %>%
+  pivot_longer(cols=c(min_annual_q01,min_annual_q05), names_to="quantile", values_to="SSB")
+tail_long$quantile <- factor(tail_long$quantile, levels=c("min_annual_q01","min_annual_q05"),
+                            labels=c("Mínimo P01 anual", "Mínimo P05 anual"))
+ggplot(tail_long, aes(Fcap, SSB, colour=quantile, group=quantile)) +
+  geom_line(linewidth=0.6) + geom_point(size=1.8) +
+  geom_hline(data=blim_check, aes(yintercept=threshold),
+             linetype="dashed", colour="#636363", inherit.aes=FALSE) +
+  facet_wrap(~Besc, ncol=2, labeller=label_both) +
+  labs(x="Fcap", y="SSB (t)", colour=NULL) + theme_bw(base_size=11)
+```
+
+El mínimo temporal del P05 anual permanece por encima de 6,561 t en los MPs examinados, lo que es coherente con un riesgo anual inferior al 5% para ese umbral. Este P05 no es el mínimo individual de SSB: pueden existir trayectorias muy bajas y episodios de cruce aunque el percentil permanezca por encima del límite. El diagnóstico de reclutamiento realizado del WD02 aporta otra parte de la explicación, al examinar la frecuencia y persistencia de las realizaciones bajas bajo las hipótesis de REF.
+
+La interpretación conjunta distingue **posición del umbral**, **distribución de las trayectorias** y **respuesta de la regla**. No atribuye el bajo riesgo a una única causa ni redefine Blim para forzar discriminación entre MPs. Cuando el criterio biológico deja elegibles todas las alternativas, la selección necesita considerar captura, cierres, variabilidad e incertidumbre de los escenarios de robustez del WD08.
+
+## Refinamiento y evaluación de 28 MPs
+
+El script 19b aumenta la resolución en el intervalo de interés de $F_{cap}$ e incorpora un nivel intermedio de $B_{esc}$:
+
+$$
+F_{cap}=\{1.00,1.25,1.50,1.60,1.70,1.75,1.80\},
+\qquad B_{esc}=\{5000,6561,7250,8000\}\ {\rm t}.
+$$
+
+El nuevo grid contiene 28 MPs: doce combinaciones reutilizadas del grid inicial y dieciséis nuevas. No es la suma de los 20 MPs iniciales y dieciséis nuevos: las alternativas con $F_{cap}=2$ y $B_{esc}=10000$ t no pertenecen al grid refinado. Se conserva el grid inicial para documentar esa decisión.
+
+Los identificadores numéricos pueden cambiar entre el grid inicial, el refinado y la tabla temporal de nuevas ejecuciones. La correspondencia se establece mediante `scenario_id` y la combinación $F_{cap}$--$B_{esc}$, nunca únicamente mediante el número de escenario.
+
+La evaluación refinada contiene 112 filas de performance, correspondientes a 28 MPs y cuatro horizontes. Las 140 comprobaciones de variables extraídas, cinco por MP, contienen 30,000 observaciones cada una, sin valores ausentes, no finitos ni negativos. Estas comprobaciones de extracción no sustituyen a los controles específicos de bloques y metadata del script 21c. El paquete de tablas proporcionado no incluye su resumen post-run; se debe conservar ese output en la trazabilidad del proyecto.
+
+```{r refined-performance}
+performance_table(refined, "Desempeño de los 28 MPs refinados bajo REF, 2025--2054.", show_id=TRUE)
+```
+
+Todos los MPs refinados cumplen el criterio de riesgo anual; el máximo es `r pct(max(refined$max_P_Blim))`%. Los resultados de los cuatro horizontes se resumen a continuación, sin mezclar el riesgo anual con la probabilidad acumulada.
+
+```{r refined-horizons}
+ht <- refined_h %>% group_by(horizon, first_year, last_year) %>%
+  summarise(n_MPs=n(), risk_max=max(max_P_Blim),
+            catch_min=min(mean_catch), catch_max=max(mean_catch), .groups="drop")
+ht <- ht[match(c("Short","Medium","Long","Full"), ht$horizon), ]
+knitr::kable(data.frame(Horizonte=ht$horizon,
+                       Periodo=paste(ht$first_year,ht$last_year,sep="--"),
+                       MPs=ht$n_MPs, `Máximo riesgo (%)`=pct(ht$risk_max),
+                       `Captura mínima (t/año)`=fmt(ht$catch_min,0),
+                       `Captura máxima (t/año)`=fmt(ht$catch_max,0),check.names=FALSE),
+             caption="Resumen del grid refinado por horizonte.", booktabs=TRUE)
+```
+
+
+```{r ref-hcr-states, fig.height=5, fig.cap="Estados operativos de la HCR en el grid refinado REF. Cada barra representa la fracción de las 30,000 observaciones año--trayectoria de un MP en cierre, F reducido o Fcap."}
+state_long <- hcr_states %>%
+  select(Fcap, Besc, closed, restricted, at_Fcap) %>%
+  pivot_longer(cols=c(closed, restricted, at_Fcap), names_to="state", values_to="fraction")
+state_long$state <- factor(state_long$state, levels=c("closed","restricted","at_Fcap"),
+                          labels=c("Cierre", "F reducido", "Fcap"))
+ggplot(state_long, aes(factor(Fcap), 100*fraction, fill=state)) +
+  geom_col() + facet_wrap(~Besc, ncol=2, labeller=label_both) +
+  labs(x="Fcap", y="Observaciones (%)", fill="Estado") +
+  scale_fill_manual(values=c("#636363", "#fdae6b", "#3182bd")) + theme_bw(base_size=11)
+```
+
+El reparto de estados muestra cómo el límite nominal de F se convierte en decisiones efectivas. Una configuración con Fcap alto puede presentar simultáneamente capturas elevadas en años abiertos y más años cerrados, por lo que Fcap no describe por sí solo la explotación realizada.
+
+Los scripts 24b y 24c describen las diferencias marginales entre niveles adyacentes, manteniendo fijo el otro parámetro. Los pasos de $F_{cap}$ del grid refinado son de distinto tamaño; sus diferencias brutas no deben interpretarse como pendientes equivalentes.
+
+```{r refined-marginal-contrast}
+a <- refined[refined$Fcap==1.5, ]
+b <- refined[refined$Fcap==1.8, ]
+b <- b[match(a$Besc,b$Besc), ]
+knitr::kable(data.frame(Besc=a$Besc,
+                       `Delta captura (t/año)`=fmt(b$mean_catch-a$mean_catch,0),
+                       `Delta cierres (pp)`=fmt(100*(b$mean_P_closed-a$mean_P_closed),2),
+                       `Delta riesgo anual (pp)`=fmt(100*(b$max_P_Blim-a$max_P_Blim),2),
+                       `Delta IAV`=fmt(b$median_IAV-a$median_IAV,3),check.names=FALSE),
+             caption="Contraste REF: Fcap 1.80 menos Fcap 1.50 a igual Besc.", booktabs=TRUE)
+```
+
+Este contraste muestra el beneficio en captura asociado a aumentar $F_{cap}$ junto con sus cambios en cierres y riesgo. Aumentar $B_{esc}$ reduce la captura media y aumenta los cierres en el grid analizado, pero no produce una reducción monótona de todas las métricas de riesgo a largo plazo. El feedback de la gestión y las secuencias de cada trayectoria requieren comparar las consecuencias simuladas, sin asumir una ordenación automática de los MPs.
+
+
+```{r ref-performance-tradeoffs, fig.height=6, fig.cap="Consecuencias de gestión en el grid refinado REF. Panel izquierdo: captura media frente a frecuencia media de cierre. Panel derecho: captura media frente a IAV mediano. Colores: Besc; etiquetas: Fcap."}
+tradeoff_ref <- refined %>%
+  transmute(Fcap, Besc, mean_catch, `Cierres (%)`=100*mean_P_closed, IAV=median_IAV) %>%
+  pivot_longer(cols=c(`Cierres (%)`, IAV), names_to="metric", values_to="value")
+ggplot(tradeoff_ref, aes(value, mean_catch, colour=factor(Besc), group=Besc)) +
+  geom_line(linewidth=0.5) + geom_point(size=2) +
+  geom_text(aes(label=sprintf("%.2f", Fcap)), size=2.5, vjust=-0.7, show.legend=FALSE) +
+  facet_wrap(~metric, scales="free_x") +
+  labs(x=NULL, y="Captura media (t/año)", colour="Besc (t)") +
+  scale_colour_brewer(palette="Dark2") + theme_bw(base_size=11)
+```
+
+Esta representación mantiene separadas la continuidad de la pesquería y la variabilidad de captura. Las curvas unen alternativas a igual Besc; no constituyen un ranking de Pareto ni una regla automática para decidir qué coste en cierres es aceptable. La elección requiere un objetivo pesquero explícito además del criterio biológico.
+
+# Selección de MPs para las pruebas de robustez
+
+## Conjunto transferido a robustez
+
+El script 25 selecciona doce combinaciones representativas:
+
+$$
+F_{cap}=\{1.50,1.70,1.80\},\qquad
+B_{esc}=\{5000,6561,7250,8000\}\ {\rm t}.
+$$
+
+Los niveles de F representan el extremo inferior, intermedio y superior del intervalo refinado seleccionado; los cuatro niveles de escapement preservan el contraste de rendimiento y cierres. La selección no declara un MP óptimo ni implica que las alternativas no seleccionadas incumplan el criterio biológico. Los IDs utilizados en robustez son los del grid refinado.
+
+```{r selected-performance}
+s <- refined[match(selected$scenario_id, refined$scenario_id), ]
+performance_table(s, "Doce MPs transferidos a robustez y su desempeño bajo REF.", show_id=TRUE)
+```
+
+## Transición a las pruebas de robustez
+
+Los doce MPs se transfieren al **WD08**, que documenta el diseño y los resultados disponibles de R-OM, S-C1 y S-C2, junto con el diagnóstico estacional de captura y capacidad. Los escenarios I0 e I1 permanecen pendientes de resultados en esa etapa. La selección aquí presentada conserva contrastes de gestión y no declara un MP final.
+
+<!-- ## Diagnóstico del reclutamiento realizado en las corridas closed-loop -->
+
+<!-- La especificación anterior describe el proceso generador. El análisis posterior de `22c_DIAGNOSE_RECRUITMENT_PROCESS_ERROR.R` examina **qué reclutamientos se realizaron después de aplicar repetidamente los MPs**, utilizando el grid inicial de 20 alternativas REF de WD07. Se documenta aquí porque complementa el componente de reclutamiento, aunque su ejecución requiere disponer primero de esas corridas. No es una segunda simulación ni un nuevo input para recondicionar el OM. -->
+
+<!-- Su objetivo es comprobar si el bajo riesgo biológico observado en REF coincide con una representación poco frecuente de reclutamientos muy bajos o persistentes. El diagnóstico no altera la distribución de proceso ni selecciona una nueva relación stock--reclutamiento. -->
+
+<!-- ### Escala relativa, frecuencia y persistencia -->
+
+<!-- Para cada combinación MP--OM se calcula la mediana de R de Q3 sobre los años proyectados y las diez réplicas. Cada observación se expresa como -->
+
+<!-- $$ -->
+<!-- R^{rel}_{t,j,MP}=\frac{R_{t,j,MP}} -->
+<!-- {\operatorname{mediana}_{t,j\in OM}(R_{t,j,MP})}. -->
+<!-- $$ -->
+
+<!-- Se examinan valores por debajo del 75%, 50% y 25% de esa escala, la presencia de algún episodio por trayectoria y las secuencias de dos o tres años consecutivos. Se conservan también las asociaciones descriptivas entre mínimo de R relativo, número de años de R bajo, persistencia y mínimo de SSB. Una asociación no demuestra causalidad ni separa el feedback de la gestión de las diferencias biológicas entre OMs. -->
+
+<!-- Los desvíos estocásticos de proceso se emparejan entre MPs, pero el R realizado no tiene por qué ser idéntico: la SSB afectada por la gestión modifica la expectativa BH. Por eso la normalización se calcula por combinación MP--OM y no mediante una única escala global. -->
+
+<!-- ```{r recruitment-realised-inputs, include=FALSE} -->
+<!-- recruit_diag_dir <- here::here("data", "mse", "diagnostics", "recruitment_process_error") -->
+<!-- recruit_global <- required_csv(file.path(recruit_diag_dir,"recruitment_global_summary.csv")) -->
+<!-- recruit_h <- required_csv(file.path(recruit_diag_dir,"recruitment_by_horizon.csv")) -->
+<!-- recruit_sequences <- required_csv(file.path(recruit_diag_dir,"recruitment_low_sequence_summary.csv")) -->
+<!-- stopifnot(nrow(recruit_sequences)==20L) -->
+<!-- recruit_full <- recruit_h[recruit_h$horizon=="Full", ] -->
+<!-- ``` -->
+
+<!-- El resumen de las 600,000 observaciones MP--año--trayectoria da un CV del reclutamiento realizado de aproximadamente `r fmt(recruit_global$R_CV,3)`. Este CV combina variación biológica y feedback; no equivale al parámetro logarítmico $\sigma_R$. Las observaciones inferiores al 75%, 50% y 25% de la escala MP--OM representan aproximadamente `r fmt(100*recruit_global$P_Rrel_lt_075,2)`%, `r fmt(100*recruit_global$P_Rrel_lt_050,3)`% y `r fmt(100*recruit_global$P_Rrel_lt_025,4)`%, respectivamente. Las observaciones reutilizan OMs y errores emparejados entre MPs: no son 600,000 realizaciones independientes. -->
+
+<!-- ```{r recruitment-relative-tail, fig.width=8, fig.height=5, out.width="95%", fig.cap="Cola inferior del reclutamiento relativo realizado en REF. Para cada MP se muestran P01 y P05 de las observaciones durante 2025--2054; colores: Besc. La escala está normalizada por la mediana MP--OM, no por un reclutamiento absoluto único."} -->
+<!-- recruit_tail <- recruit_full %>% select(Fcap, Besc, Rrel_q01, Rrel_q05) %>% -->
+<!--   pivot_longer(cols=c(Rrel_q01,Rrel_q05), names_to="quantile", values_to="Rrel") -->
+<!-- ggplot(recruit_tail, aes(Fcap, Rrel, colour=factor(Besc))) + -->
+<!--   geom_line(linewidth=0.6) + geom_point(size=1.8) + -->
+<!--   facet_wrap(~quantile, labeller=as_labeller(c(Rrel_q01="P01",Rrel_q05="P05"))) + -->
+<!--   geom_hline(yintercept=0.5, linetype="dashed", colour="#636363") + -->
+<!--   labs(x="Fcap", y="Reclutamiento relativo", colour="Besc (t)") + -->
+<!--   scale_colour_brewer(palette="Dark2") + theme_bw(base_size=11) -->
+<!-- ``` -->
+
+<!-- ```{r recruitment-low-persistence, fig.width=8, fig.height=6, out.width="95%", fig.cap="Frecuencia de episodios de reclutamiento relativo inferior a 0.5 en REF. Los paneles muestran alguna ocurrencia y rachas de al menos dos o tres años por trayectoria; las escalas verticales son independientes."} -->
+<!-- recruit_persistence <- recruit_sequences %>% -->
+<!--   select(Fcap, Besc, P_any_R050, P_run2_R050, P_run3_R050) %>% -->
+<!--   pivot_longer(cols=c(P_any_R050,P_run2_R050,P_run3_R050), names_to="event", values_to="probability") -->
+<!-- recruit_persistence$event <- factor(recruit_persistence$event, -->
+<!--   levels=c("P_any_R050","P_run2_R050","P_run3_R050"), -->
+<!--   labels=c("Algún año", "Racha de al menos 2 años", "Racha de al menos 3 años")) -->
+<!-- ggplot(recruit_persistence, aes(Fcap,100*probability,colour=factor(Besc))) + -->
+<!--   geom_line(linewidth=0.6) + geom_point(size=1.8) + -->
+<!--   facet_wrap(~event, ncol=1, scales="free_y") + -->
+<!--   labs(x="Fcap", y="Trayectorias (%)", colour="Besc (t)") + -->
+<!--   scale_colour_brewer(palette="Dark2") + theme_bw(base_size=11) -->
+<!-- ``` -->
+
+<!-- En el grid inicial, experimentar algún reclutamiento relativo inferior a 0.5 ocurre aproximadamente en el 2.2--4.1% de las trayectorias por MP. Las rachas de al menos dos años alcanzan como máximo el 0.3% y las de tres años el 0.1%. El diagnóstico muestra que estos episodios severos persistentes son poco frecuentes bajo las hipótesis de REF. Ayuda a interpretar el bajo riesgo de SSB, pero no prueba que la variabilidad especificada cubra eventos más extremos, regímenes persistentes o cambios ambientales no incluidos. -->
+
+<!-- ### Enlace con la evaluación del riesgo -->
+
+<!-- El WD07 complementa esta lectura mediante la sensibilidad al umbral biológico de 22b: comprueba si elevar el límite cambia la conclusión de bajo riesgo usando las mismas trayectorias. Ambos diagnósticos responden preguntas distintas. Este WD02 examina la distribución y persistencia del reclutamiento; WD07 examina la posición del umbral respecto de SSB. Ninguno por separado demuestra que el MP sea robusto frente a todas las hipótesis alternativas. -->
+
+
+# Trazabilidad y reproducibilidad
+
+El documento lee los CSV existentes, comprueba la integridad de las tablas de REF y genera tablas y figuras al renderizar. No ejecuta el MSE ni modifica inputs, resultados o controles de la flota. Los archivos se localizan desde la raíz del proyecto mediante `here` y se detiene el renderizado si falta una tabla necesaria.
+
+| Etapa | Scripts | Outputs utilizados o conservados |
+|:--|:--|:--|
+| Diseño inicial y ejecución | 19, 20 | Grid, mapas y bloques de MPs |
+| Validación y dinámica inicial | 21, 21b | Validación y diagnósticos iniciales |
+| Performance y presentación | 22, 23 | Performance por horizonte y tablas |
+| Sensibilidad del umbral biológico | 22b Blim | Umbrales y cola inferior de SSB; 22c se documenta en WD02 |
+| Screening y trade-offs | 24, 24b | Elegibilidad y contrastes marginales |
+| Refinamiento | 19b, 21c, 21d, 22b evaluación, 24c | Grid refinado, comprobaciones y performance |
+| Selección y diseño de robustez | 25, 26 | Doce MPs y definición de escenarios |
+
+Las rutas principales de las tablas leídas son `data/mse/performance/`, `data/mse/performance_refined/`, `data/mse/diagnostics/`, `outputs/mse/validation/`, `outputs/mse/candidate_MP_selection/robustness/`. Las corridas completas se conservan separadamente en `data/mse/MP_runs/` y `data/mse/robustness_runs/`; se necesitan para regenerar las métricas desde los objetos de simulación, pero no para renderizar estas tablas.
+
+Se deben conservar inputs condicionados, mapas de iteraciones, fuentes de error emparejadas, semillas y versiones de R, FLBEIA y demás paquetes. Los archivos de entorno local y CESGA se registran en `report/reproducibility/`. Las tablas no constituyen por sí solas una verificación de ejecución completa desde una copia limpia del repositorio.
+
+El resumen post-run del grid refinado nuevo debe acompañar al archivo completo del proyecto. Las comprobaciones de extracción de variables incluidas en este WD no sustituyen ese output. La trazabilidad de las comparaciones de robustez se documenta en WD08.
+
+# Conclusiones
+
+El ensemble REF permite evaluar y refinar las alternativas de gestión manteniendo emparejadas las fuentes de incertidumbre. Los 20 MPs iniciales y los 28 refinados cumplen el criterio de riesgo anual del 5% bajo esta configuración. El criterio no identifica una alternativa óptima: las diferencias en captura, cierres y variabilidad siguen siendo relevantes para la elección.
+
+El conjunto transferido a robustez conserva doce combinaciones representativas de $F_{cap}$ y $B_{esc}$. El WD08 examina si las diferencias de rendimiento, riesgo e implementación se mantienen al modificar el error de reclutamiento, el reparto estacional de capturas o la información disponible.
+
+La selección final requiere valorar estas consecuencias y completar las comparaciones de información I0 e I1. Los resultados no justifican todavía declarar un MP final ni extrapolar el bajo riesgo observado a fuentes de incertidumbre que el diseño no haya evaluado.
+
+La secuencia completa permite seguir cada resultado hasta su componente de origen: condicionamiento biológico (WD01), reclutamiento (WD02), pesquería (WD03), controles del sistema (WD04), percepción (WD05), decisión (WD06) y consecuencias (WD07). La elección final del MP queda abierta hasta integrar los resultados de información I0 e I1 y valorar conjuntamente riesgo, captura, cierres y variabilidad; no se introduce un criterio de selección nuevo al cerrar la documentación.
+
+# Referencias
+
+Trochta, J. T., Bogstad, B., Kovalev, Y., Prozorkevich, D., Skaret, G., Vatnehol, S. y Howell, D. (2024). *Report on evaluation of harvest rules for Barents Sea capelin — full report*. IMR–PINRO 2024-17. [Informe](https://www.hi.no/hi/nettrapporter/imr-pinro-en-2024-17).
