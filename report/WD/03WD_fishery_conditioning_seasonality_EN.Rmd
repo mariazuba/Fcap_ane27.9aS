@@ -1,0 +1,572 @@
+---
+title: "Fishery conditioning and seasonal catch allocation for the shortcut MSE of ane.27.9aS"
+
+author:
+  - "María José Zúñiga"
+  - "Fernando Ramos"
+  - "María Ángeles Gamaza"
+
+date: "`r format(Sys.Date(), '%d-%m-%Y')`"
+
+output:
+  bookdown::pdf_document2:
+    toc: false
+    toc_depth: 3
+    number_sections: true
+    keep_tex: false
+
+bibliography: report_biblio.bib
+csl: ices-journal-of-marine-science.csl
+link-citations: true
+---
+
+**Working Document 03 — WKSPSIM 2026**
+
+**Stock:** Anchovy (*Engraulis encrasicolus*) in the southern part of Division 9.a  
+(Gulf of Cadiz and southern part of Portugal), ane.27.9aS
+
+**Affiliation:** Instituto Español de Oceanografía (IEO-CSIC), Centro Oceanográfico de Cádiz, Spain
+
+```{r setup, include=FALSE}
+library(knitr)
+library(here)
+library(dplyr)
+library(tidyr)
+library(readr)
+
+rds_dir <- here("data", "Rdata")
+ref_fig_dir <- here("outputs", "fishery_conditioning", "figures")
+ref_tab_dir <- here("outputs", "fishery_conditioning", "tables")
+sens_fig_dir <- here("outputs", "fishery_sensitivity", "figures")
+sens_tab_dir <- here("outputs", "fishery_sensitivity", "tables")
+
+required_csv <- function(path) {
+  if (!file.exists(path)) stop("Missing WD input: ", path)
+  read_csv(path, show_col_types = FALSE)
+}
+
+required_file <- function(path) {
+  if (!file.exists(path)) stop("Missing WD input: ", path)
+  path
+}
+
+seasonal_summary_file <- file.path(ref_tab_dir, "seasonal_catch_allocation_summary.csv")
+seasonal_check_file <- file.path(ref_tab_dir, "reference_seasonal_share_check_100OMs.csv")
+catch_age_file <- file.path(ref_tab_dir, "historical_catch_at_age_composition_by_quarter_table.csv")
+
+trend_file <- file.path(sens_tab_dir, "seasonal_catch_allocation_trend_results.csv")
+break_file <- file.path(sens_tab_dir, "seasonal_catch_allocation_breakpoints.csv")
+changepoint_file <- file.path(sens_tab_dir, "seasonal_catch_allocation_changepoints_meanvar.csv")
+pca_variance_file <- file.path(sens_tab_dir, "seasonal_catch_allocation_pca_variance.csv")
+cluster_file <- file.path(sens_tab_dir, "seasonal_catch_allocation_cluster_summary.csv")
+candidate_file <- file.path(sens_tab_dir, "candidate_seasonal_catch_allocation_scenarios.csv")
+
+catch_age_fig_file <- required_file(file.path(ref_fig_dir, "historical_catch_at_age_composition_by_quarter.png"))
+trend_fig_file <- required_file(file.path(sens_fig_dir, "seasonal_catch_allocation_trends.png"))
+cluster_fig_file <- required_file(file.path(sens_fig_dir, "seasonal_catch_allocation_cluster_means.png"))
+candidate_fig_file <- required_file(file.path(sens_fig_dir, "candidate_seasonal_catch_allocation_scenarios.png"))
+
+seasonal_summary <- required_csv(seasonal_summary_file)
+seasonal_check <- required_csv(seasonal_check_file)
+catch_age_table <- required_csv(catch_age_file)
+
+trend_results <- required_csv(trend_file)
+break_results <- required_csv(break_file)
+changepoint_results <- required_csv(changepoint_file)
+pca_variance <- required_csv(pca_variance_file)
+cluster_summary <- required_csv(cluster_file)
+candidate_scenarios <- required_csv(candidate_file)
+
+stopifnot(n_distinct(seasonal_check$om) == 100)
+stopifnot(n_distinct(seasonal_check$season) == 4)
+stopifnot(nrow(seasonal_check) == 400)
+stopifnot(all(candidate_scenarios$scenario %in% c("historical", "recent10", "recent3", "cluster_1", "cluster_2", "cluster_3")))
+stopifnot(all(abs(candidate_scenarios |> group_by(scenario) |> summarise(total = sum(prop), .groups = "drop") |> pull(total) - 1) < 1e-10))
+
+seasonal_share_max_diff <- max(seasonal_check$abs_diff, na.rm = TRUE)
+
+reference_share <- seasonal_check |>
+  group_by(season) |>
+  summarise(
+    mean_reference_share = mean(reference_share, na.rm = TRUE),
+    sd_reference_share = sd(reference_share, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+seasonal_summary_table <- seasonal_summary |>
+  select(season, mean_prop, sd_prop, p05_prop, p50_prop, p95_prop)
+
+trend_break_table <- trend_results |>
+  select(season, slope, p_value_slope, r_squared) |>
+  left_join(break_results |> select(season, n_breaks, break_years), by = "season") |>
+  left_join(changepoint_results |> select(season, n_changepoints, changepoint_years), by = "season")
+
+pc1_var <- pca_variance |>
+  filter(PC == "PC1") |>
+  pull(variance_explained)
+
+pc2_var <- pca_variance |>
+  filter(PC == "PC2") |>
+  pull(variance_explained)
+
+candidate_table <- candidate_scenarios |>
+  mutate(season = paste0("Q", season)) |>
+  select(scenario, season, prop) |>
+  pivot_wider(names_from = season, values_from = prop) |>
+  arrange(factor(scenario, levels = c("historical", "recent10", "recent3", "cluster_1", "cluster_2", "cluster_3")))
+
+fmt <- function(x, n = 3) formatC(as.numeric(x), format = "f", digits = n)
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = "center",
+  out.width = "90%"
+)
+```
+
+# Fishery conditioning
+
+## General approach
+
+The fishery component of the Operating Model (OM) was constructed from the
+conditioned ane.27.9aS trajectories described in WD01. The fishery is
+represented in FLBEIA by one fleet (`SEINE`), one métier (`ALL`), and one
+exploited stock (`ANE`) [@Garcia2017FLBEIA].
+
+Historical fishery variables were transferred from the SS3 bootstrap
+realizations, maintaining the correspondence between the population and
+fishery of each OM. The historical period covers 1989--2024 and the
+projection covers 2025--2054. The 100 historical conditions were expanded
+to 1,000 trajectories, with 10 replicates per OM.
+
+For the projection, catchability, fleet variables, and seasonal catch
+allocation were parameterized from recent historical periods. Effort,
+fishing mortality, and realized catches during the projection are
+subsequently generated within the FLBEIA simulations.
+
+The reference seasonal allocation was defined from the quarterly catch
+proportions observed during 2015--2024. Historical variation in these
+proportions was examined to define alternative patterns subsequently used
+in the robustness analysis.
+
+# Methods {#methods}
+
+## Historical fishery structure
+
+The historical fishery remains associated with each biological OM
+condition. Thus, differences among OMs are not limited to population state
+and dynamics; each OM also retains the catch history corresponding to its
+SS3 bootstrap refit.
+
+The 100 historical conditions were expanded to 1,000 trajectories,
+maintaining the correspondence between each projection trajectory and its
+source OM. Numbers and weights at age for landings and discards were
+transferred to the FLBEIA fishery component through an `FLCatchExt`,
+integrated into métier `ALL` and fleet `SEINE`.
+
+In SS3, the weight at age used for the stock and catch is the same. This assumption was retained during conversion to FLBEIA by checking, for each OM, the correspondence between `landings.wt` and the weight at age of the biological component (`wt`). A maximum absolute-difference tolerance of \(10^{-10}\) was used.
+
+## Fleet variables and projection assumptions
+
+The projected fishery retains the historically conditioned fleet
+structure, whereas effort and catches are determined dynamically during the
+simulation. The fleet object includes the `effort.share`, `vcost`, `effort`,
+`capacity`, `crewshare`, and `fcost` components.
+
+For 2025--2054, `landings.wt`, `discards.wt`, `vcost`, `fcost`, and
+`crewshare` were fixed from the iteration-specific 2022--2024 mean.
+Thus, the conditions used during the projection retain differences among
+OMs derived from historical conditioning.
+
+In the configuration used, `vcost` and `effort` were set to 1,
+`capacity` to 5,000, and `crewshare` and `fcost` to 0. `effort.share` was
+retained from the input file. `alpha`, `beta`, `effort.share`, and `capacity`
+were initially extended from historical values. During the projection,
+`beta` and `effort` were initialized at 1, whereas `landings.n` and
+`discards.n` were initialized at 0.
+
+These values define the initial fishery conditions. Effort, fishing
+mortality, and realized catches during 2025--2054 are subsequently
+determined within the FLBEIA simulations.
+
+
+## Effort and catch models
+
+During the projection, the fishery responds to the target catch established
+by the management procedure through adjustment of fishing effort. The
+relationship between effort and stock exploitation is represented through
+catchability (`catch.q`), whereas realized catch is calculated from stock
+abundance and natural and fishing mortality using the Baranov catch equation.
+
+In FLBEIA, this dynamic is implemented using `SMFB` as the effort model
+and `Baranov` as the catch model [@Garcia2017FLBEIA]. The effort constraint
+is linked to stock `ANE` and specified in terms of catch.
+
+Catchability (`catch.q`) was calculated for each OM using the 2020--2024
+period and kept constant during 2025--2054. Therefore, differences among OMs
+in this component are retained during the projection. Non-finite values
+obtained when calculating `catch.q` were replaced by zero.
+
+Fleet capacity was kept constant through `fixedCapital`, with
+`capacity = 5000`. `catch.threshold` was set to 0.9 and `alpha` to 1.
+
+Catch was assigned to landings (`landings.sel = 1`) and discards were not
+modeled (`discards.sel = 0`). The discard mechanism associated with catches
+above quota was also disabled (`discard.TAC.OS = FALSE`).
+
+## Reference seasonal catch allocation
+
+The OM is structured into four quarters and, therefore, annual catch must
+be distributed among the four seasons. This allocation determines when
+exploitation occurs within the year and its temporal relationship with
+population dynamics, including spawning in Q2 and recruitment entry in Q3.
+
+Seasonal allocation is expressed as the proportion of annual catch
+occurring in each quarter. For OM \(i\), year \(y\), and quarter
+\(s\), this proportion is calculated as
+
+\[
+p_{iys} =
+\frac{C_{iys}}
+{\sum_{s=1}^{4} C_{iys}},
+\]
+
+where \(C_{iys}\) is the biomass caught in quarter \(s\). The four
+proportions sum to one for each OM-year combination.
+
+For the reference configuration, the seasonal allocation of each OM was
+defined as the mean of the quarterly proportions observed during
+2015--2024:
+
+\[
+\bar{p}_{is}^{\,2015:2024}
+=
+\frac{1}{10}
+\sum_{y=2015}^{2024} p_{iys}.
+\]
+
+The resulting four proportions were retained during 2025--2054 for the
+corresponding OM. Thus, this parameterization determines the distribution
+of catch among quarters, but not the magnitude of annual catch, which is
+determined during the simulation.
+
+Each of the 100 OMs retains its own 2015--2024 seasonal allocation.
+The ten replicates derived from the same OM share these proportions. For
+historical diagnostics, one representative trajectory per OM was used,
+avoiding treatment of replicates as independent historical observations.
+
+Implementation was checked by reconstructing the mean 2015--2024
+proportions from historical catches and comparing them with the values
+stored in `fleets.ctrl`. A maximum absolute-difference tolerance of
+\(10^{-10}\) was used.
+
+## Historical catch by age and quarter
+
+The age composition of catch describes which ages contribute to
+exploitation in each quarter and allows its variation during the historical
+period to be characterized.
+
+For each OM, year, and quarter, catch at age was calculated as the sum of
+landed and discarded numbers. The numbers caught at each age were then
+expressed as a proportion of the total catch in the quarter.
+
+These proportions were used only to describe the historical age
+composition of the conditioned fishery. They were not used to fix catch
+composition during 2025--2054. During the projection, catch at age is
+determined dynamically from population structure and simulated exploitation
+in FLBEIA.
+
+## Diagnostics of temporal variation in seasonal allocation
+
+The distribution of catches among quarters may vary over time, changing
+when exploitation occurs within the year. Because the reference configuration
+uses the mean 2015--2024 allocation, the historical series was examined to
+characterize its temporal variation and determine whether patterns different
+from that used in REF exist.
+
+Diagnostics were based on the annual mean quarterly proportions of the
+100 historical OMs. For each quarter, change in the catch proportion over
+time was evaluated using a linear regression against year. Changes in the
+series were also examined using `strucchange::breakpoints()` and
+`changepoint::cpt.meanvar()`, the latter using PELT with an MBIC penalty.
+
+The distribution of catch among the four quarters was also analyzed
+jointly. Principal component analysis (PCA) was applied to centered and
+scaled annual quarterly proportions to summarize the main changes in
+seasonal allocation. Hierarchical clustering was then applied to the scaled
+proportions, using Euclidean distance and Ward's method (`ward.D2`), to
+group years with similar seasonal distributions.
+
+Three groups (\(k=3\)) were used to summarize contrasting historical
+patterns and define alternative seasonal-allocation configurations. These
+groups are used as a tool to characterize historical variability and are
+not interpreted as three discrete fishery regimes.
+
+These diagnostics do not modify the reference configuration. The identified
+historical patterns are subsequently used to define alternative
+seasonal-allocation configurations in the sensitivity/robustness analysis.
+
+## Seasonal patterns for the robustness analysis
+
+Alternative patterns for distributing annual catch among the four quarters
+were defined from historical variability. These patterns represent different
+timings of exploitation within the year without, by themselves, modifying
+the magnitude of annual catch.
+
+The patterns were obtained from the mean of the full historical period,
+the 2015--2024 mean, the 2022--2024 mean, and the means of the three groups
+identified by clustering. Each vector was normalized so that the four
+quarterly proportions summed to one.
+
+The reference configuration uses the 2015--2024 mean. For the sensitivity
+analysis, the patterns corresponding to clusters 1 and 2, denoted S-C1 and
+S-C2, were also selected. These patterns retain the historical structure
+observed in each group and allow the effect of modifying the within-year
+temporal distribution of exploitation to be evaluated subsequently.
+
+WD03 documents the construction and historical origin of these patterns.
+Their implementation and effects on MSE performance are evaluated in WD08.
+
+
+# Results {#results}
+
+
+## Reference seasonal allocation
+
+The 2015--2024 seasonal means reconstructed from historical catches
+matched the values stored in the reference fleet control object. The maximum
+absolute difference was
+`r format(seasonal_share_max_diff, scientific = TRUE)`, compared with the
+implementation criterion of \(10^{-10}\).
+
+Across the 100 historical OMs, the mean reference allocation was
+`r paste0("Q", reference_share$season, " = ", sprintf("%.3f", reference_share$mean_reference_share), collapse = "; ")` (Table \@ref(tab:table-reference-seasonal-share) ).
+
+
+
+```{r table-reference-seasonal-share}
+kable(
+  reference_share,
+  digits = 3,
+  col.names = c("Quarter", "Mean reference share", "SD among OMs"),
+  caption = "Seasonal catch allocation used in the reference projection. Values assigned to each OM correspond to its own 2015--2024 mean; the table summarizes these OM-specific values for the 100 historical OMs."
+)
+```
+
+## Historical variation in seasonal allocation
+
+The distribution of exploitation among quarters varied during 1989--2024.
+Table \@ref(tab:table-seasonal-summary) summarizes the catch proportions
+observed across OMs and years and describes the magnitude of this variation
+in each quarter.
+
+```{r table-seasonal-summary}
+kable(
+  seasonal_summary_table,
+  digits = 3,
+  col.names = c("Quarter", "Mean", "SD", "5%", "Median", "95%"),
+  caption = "Historical seasonal catch-allocation proportions for the 100 conditioned OMs and years 1989--2024."
+)
+```
+
+Temporal diagnostics describe how the contribution of each quarter to
+annual catch changed during the historical period. Table
+\@ref(tab:table-seasonal-temporal) presents the linear trends and changes
+identified in the quarterly series.
+
+These results characterize historical variation in the temporal
+distribution of exploitation. The reference configuration retains the
+OM-specific 2015--2024 mean.
+
+```{r table-seasonal-temporal}
+trend_break_display <- trend_break_table |>
+  mutate(
+    slope = round(slope, 5),
+    p_value_slope = signif(p_value_slope, 3),
+    r_squared = round(r_squared, 3)
+  ) |>
+  rename(
+    Quarter = season,
+    Slope = slope,
+    `p-value` = p_value_slope,
+    `R2` = r_squared,
+    Breaks = n_breaks,
+    `Break years` = break_years,
+    Changes = n_changepoints,
+    `Change years` = changepoint_years
+  )
+
+kable(
+  trend_break_display,
+  format = "latex",
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Temporal diagnostics of historical seasonal catch allocation. The diagnostics characterize the historical series and are not used to redefine the reference OM."
+)
+```
+
+```{r fig-seasonal-trends, out.width="85%", fig.align="center", fig.cap="Annual seasonal catch-allocation proportions and quarter-specific linear trends during 1989--2024. The diagnostic is based on annual mean proportions across the 100 conditioned OMs."}
+knitr::include_graphics(trend_fig_file)
+```
+
+## Multivariate seasonal patterns
+
+The first two principal components explained, respectively,
+`r sprintf("%.1f", 100 * pc1_var)`% and
+`r sprintf("%.1f", 100 * pc2_var)`% of the variation in the scaled quarterly
+proportions, and
+`r sprintf("%.1f", 100 * (pc1_var + pc2_var))`% jointly.
+
+Hierarchical clustering with \(k=3\) grouped years with similar quarterly
+distributions and produced three mean seasonal-allocation patterns. These
+groups summarize different historical configurations of the temporal
+distribution of exploitation and were used to construct patterns for the
+robustness analysis. They are not interpreted as three chronological fishery
+regimes.
+
+```{r table-cluster-means}
+cluster_table <- cluster_summary |>
+  select(cluster, season, mean_prop) |>
+  mutate(season = paste0("Q", season)) |>
+  pivot_wider(names_from = season, values_from = mean_prop)
+
+kable(
+  cluster_table,
+  digits = 3,
+  caption = "Mean quarterly catch-allocation proportions for the three diagnostic historical clusters."
+)
+```
+
+```{r fig-cluster-means, fig.cap="Mean quarterly catch-allocation proportions for the three historical groups. The groups are used to construct alternative seasonal-allocation patterns and do not modify the reference OM."}
+knitr::include_graphics(cluster_fig_file)
+```
+
+## Seasonal patterns for the robustness analysis
+
+Six seasonal-allocation patterns were obtained from the historical
+diagnostics: the 1989--2024 mean, the 2015--2024 mean, the 2022--2024 mean,
+and the means of the three groups identified by clustering.
+
+Each pattern represents a different distribution of annual catch among
+Q1--Q4. The reference configuration retains OM-specific 2015--2024 means.
+Therefore, the aggregated `recent10` pattern is used only as a summary of
+this period and does not replace the OM-specific proportions used in REF.
+
+The patterns corresponding to clusters 1 and 2 are subsequently used as
+S-C1 and S-C2 in the robustness analysis documented in WD08.
+
+```{r table-candidate-seasonal-patterns}
+kable(
+  candidate_table,
+  digits = 3,
+  col.names = c("Scenario", "Q1", "Q2", "Q3", "Q4"),
+  caption = "Candidate seasonal catch-allocation patterns generated from the historical diagnostics. The reference OM retains OM-specific 2015--2024 means rather than replacing them with the single aggregated recent10 vector shown here."
+)
+```
+
+```{r fig-candidate-seasonal-patterns, out.width="85%", fig.align="center", fig.cap="Candidate seasonal catch-allocation patterns generated from the historical diagnostics. These patterns define possible sensitivity scenarios; their effects on MSE performance are evaluated subsequently."}
+knitr::include_graphics(candidate_fig_file)
+```
+
+
+
+## Historical catch by age and quarter
+
+Catch age composition differed among quarters during the historical period.
+Table \@ref(tab:table-catch-age) summarizes the mean contribution of each
+age to quarterly catch in the conditioned OMs.
+
+These proportions describe the age structure of historical exploitation.
+They are not used as a fixed composition during the projection, in which
+catch at age is determined from the available population and simulated
+exploitation in FLBEIA.
+
+```{r table-catch-age}
+catch_age_display <- catch_age_table
+names(catch_age_display) <- sub("Age_3$", "Age_3plus", names(catch_age_display))
+
+kable(
+  catch_age_display,
+  digits = 3,
+  caption = "Mean historical catch composition by age and quarter across conditioned OMs and historical years. Age 3 represents the 3+ group."
+)
+```
+
+```{r fig-catch-age, out.width="80%", fig.align="center", fig.cap="Mean historical catch composition by age and quarter across conditioned OMs. Catch at age is a historical diagnostic; future realized catch at age is generated dynamically during FLBEIA simulations."}
+knitr::include_graphics(catch_age_fig_file)
+```
+
+
+# Reproducibility
+
+The reference fishery is constructed using `10_built_fleet_Reference.R` after generating the biological OM and recruitment-conditioning objects. The script reads the conditioned biological and stock objects, the 1,000-iteration map, and the CSV files containing SEINE fleet variables. It generates:
+
+- `data/Rdata/ane_stock_conditioned_1000iter.rds`;
+- `data/Rdata/fleets_conditioned_1000iter.rds`;
+- `data/Rdata/fleets_ctrl_reference_1000iter.rds`.
+
+Subsequently, `11_seasonal_catch_allocation_diagnostics.R` reads the conditioned stock, fleet, fleet controls, and iteration map. Reference documentation outputs are stored in `outputs/fishery_conditioning/`, whereas temporal diagnostics, PCA, clustering, and candidate scenarios are stored separately in `outputs/fishery_sensitivity/`.
+
+The main reference settings are summarized in Table \@ref(tab:table-reference-settings).
+
+```{r table-reference-settings}
+reference_settings <- tibble::tribble(
+  ~Component, ~Reference_setting,
+  "Historical period", "1989-2024",
+  "Projection period", "2025-2054",
+  "Fleet / metier / stock", "SEINE / ALL / ANE",
+  "Historical OM conditions", "100",
+  "Projection trajectories", "1000 (10 per historical OM)",
+  "Effort model", "SMFB",
+  "Catch model", "Baranov",
+  "Effort restriction", "catch (ANE)",
+  "Capital model", "fixedCapital",
+  "Catch threshold", "0.9",
+  "Catchability averaging period", "2020-2024",
+  "Projection weight/fleet averaging period", "2022-2024",
+  "Reference seasonal-share averaging period", "2015-2024, OM-specific",
+  "landings.sel", "1",
+"discards.sel", "0",
+"discard.TAC.OS", "FALSE",
+  "Future landings.n / discards.n", "initialised at 0",
+  "Future beta / effort", "initialised at 1",
+  "Future realised catch-at-age", "generated dynamically during simulation"
+)
+
+kable(
+  reference_settings,
+  caption = "Main settings used to construct the reference OM fishery component."
+)
+```
+
+# Conclusions
+
+- The fishery was incorporated into the OM while maintaining the correspondence
+  between each biological condition and the fishery history derived from the
+  same SS3 bootstrap refit. During the projection, effort, fishing mortality,
+  and catches are generated dynamically in FLBEIA.
+
+- The reference configuration allocates most annual catch to Q2 and Q3, which
+  together account for approximately 75% of the catch. This recent pattern
+  shows little variation among the 100 OMs and is retained during 2025--2054
+  on an OM-specific basis.
+
+- Seasonal allocation was not constant during 1989--2024. The main changes
+  were observed in Q1 and Q3, with a decrease in the contribution of Q1 and
+  an increase in Q3. Multivariate analyses identified different historical
+  patterns in the distribution of catch among quarters.
+
+- Catch age composition also shows a seasonal structure. Q1 and Q2 catches
+  are dominated by age-1 individuals, whereas the contribution of age 0
+  increases in Q3 and constitutes the largest proportion of catch in Q4.
+  This historical composition is not imposed during the projection.
+
+- Historical variability in seasonal allocation was used to define
+  alternative exploitation patterns. The patterns corresponding to clusters
+  1 and 2 were selected as S-C1 and S-C2 to subsequently evaluate MSE
+  sensitivity to changes in the within-year temporal distribution of
+  exploitation.
+
+# References

@@ -1,0 +1,720 @@
+---
+title: "Open-loop validation of the reference Operating Model for the shortcut MSE of ane.27.9aS"
+
+author:
+  - "María José Zúñiga Basualto"
+  - "Fernando Ramos"
+  - "María Ángeles Gamaza"
+
+date: "`r format(Sys.Date(), '%d-%m-%Y')`"
+
+output:
+  bookdown::pdf_document2:
+    toc: false
+    toc_depth: 3
+    number_sections: true
+    keep_tex: false
+
+bibliography: report_biblio.bib
+csl: ices-journal-of-marine-science.csl
+link-citations: true
+---
+
+
+
+**Working Document 04 — WKSPSIM 2026**
+
+**Stock:** Anchovy (*Engraulis encrasicolus*) in the southern part of Division 9.a  
+(Gulf of Cadiz and southern part of Portugal), ane.27.9aS
+
+**Affiliation:** Instituto Español de Oceanografía (IEO-CSIC), Centro Oceanográfico de Cádiz, Spain
+
+
+
+```{r setup, include=FALSE}
+library(knitr)
+library(here)
+library(dplyr)
+library(tidyr)
+library(kableExtra)
+
+fig_dir <- here("outputs", "OM")
+tab_dir <- here("outputs", "OM", "tables")
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = "center"
+)
+
+read_output_csv <- function(filename) {
+  path <- file.path(tab_dir, filename)
+  if (!file.exists(path)) {
+    stop(
+      paste0(
+        "Required output not found: ", path,
+        ". Run 13_VALIDATE_REFERENCE_OM.R first."
+      )
+    )
+  }
+  read.csv(path, check.names = FALSE)
+}
+
+include_output_figure <- function(filename, ...) {
+  path <- file.path(fig_dir, filename)
+  if (!file.exists(path)) {
+    stop(
+      paste0(
+        "Required figure not found: ", path,
+        ". Run 13_VALIDATE_REFERENCE_OM.R first."
+      )
+    )
+  }
+  knitr::include_graphics(path, ...)
+}
+```
+
+# General approach
+
+The Operating Model (OM) of the *shortcut* Management Strategy Evaluation (MSE)
+for *ane.27.9aS* was constructed from the SS3 assessment adopted at WKBANSP
+[@ICES2024WKBANSP] and subsequently documented in the Stock Annex
+[@ICES2025StockAnnex9aS]. Conditioning of the biological, stock--recruitment,
+and fishery components is documented in WD01--03.
+
+Before incorporating the assessment and management rule, the OM was validated
+using *open-loop* simulations. In these simulations, no assessment is run
+during the projection and stock status is obtained directly from the OM.
+The validation checks implementation of the projection rules and the behaviour
+of the population and fishery under predefined conditions.
+
+The validation uses 100 conditioned OMs and 10 realizations of recruitment
+process error per OM, for a total of 1,000 trajectories during 2025--2054.
+Variability among OMs arises from historical conditioning. The ten replicates
+of each OM share the same historical condition and differ in the future
+realization of recruitment process error [@Punt2016].
+
+Two *open-loop* controls were evaluated. C0 sets fishing mortality to zero
+and allows population dynamics to be checked in the absence of fishing. C7000
+prescribes a constant annual catch of 7,000 t and allows the response of the
+stock, fishing mortality, and realized catch to be checked. These controls are
+used to validate the OM and do not correspond to candidate Management
+Procedures (MPs).
+
+La secuencia de validación es:
+
+\[
+\begin{aligned}
+&\text{Conditioned OM} \\
+&\downarrow \\
+&\text{100 OMs} \\
+&\downarrow \\
+&\text{10 realizations per OM} \\
+&\downarrow \\
+&\text{1000 trajectories} \\
+&\downarrow \\
+&\begin{cases}
+\text{C0: no fishing} \\
+\text{C7000: constant annual catch of 7000 t}
+\end{cases} \\
+&\downarrow \\
+&\text{open-loop validation}
+\end{aligned}
+\]
+
+The components used to close the management loop are documented in the
+following WDs: assessment error in WD05, the management rule in WD06, and
+evaluation of the MPs in WD07.
+
+
+# Methods
+
+## Reference OM configuration and simulation design
+
+The validation uses the biological, stock--recruitment, and fishery
+components conditioned in WD01--03. The OM represents the *ane.27.9aS*
+population by age and quarter and a single fleet, SEINE. The interaction
+between the population and fishery is implemented in FLBEIA using the `SMFB`
+effort model and the Baranov catch equation [@Garcia2017FLBEIA].
+
+The projections cover 2025--2054. The 100 conditioned OMs are projected
+using 10 realizations of recruitment process error per OM, for a total of
+1,000 trajectories. The ten realizations retain the parameters of the source
+OM and differ in the realization of future recruitment process error.
+
+Each OM retains its specific Beverton--Holt stock--recruitment parameters.
+In the reference configuration, recruitment process error uses a common
+standard deviation, defined as the median of the values estimated for the
+100 conditioned OMs:
+
+\[
+\sigma_R^{REF}=0.2163.
+\]
+
+The error is applied during 2025--2054 using bias-corrected lognormal
+multipliers.
+
+The projection rules for the biological and fishery components correspond
+to those defined during OM conditioning. Weight at age is fixed from the
+OM-specific 2022--2024 mean, and natural mortality is obtained using the
+body-weight scaling of @Lorenzen1996. Fleet catchability is based on
+2020--2024 and seasonal catch allocation on 2015--2024, both OM-specific.
+These values are retained during 2025--2054.
+
+The reference points used in the diagnostics are
+\(B_{lim}=4721\) t and \(B_{pa}=6561\) t. At this stage, they are used to
+quantify how frequently trajectories fall below these levels and not as
+acceptance criteria for a Management Procedure.
+
+
+### Summary configuration
+
+```{r tab-reference-configuration}
+reference_configuration <- tibble::tribble(
+  ~Componente, ~Configuración,
+  "Stock", "ane.27.9aS",
+  "Historical period", "1989–2024",
+  "Projection period", "2025–2054",
+  "Ages", "0–3+",
+  "Seasons", "Q1–Q4",
+  "SSB", "Q2",
+  "Recruitment entry", "Age 0, Q3",
+  "Conditioned OMs", "100",
+  "Realizations per OM", "10",
+  "Projection trajectories", "1000",
+  "Stock–recruitment relationship", "OM-specific Beverton–Holt",
+  "Recruitment process error", "Lognormal; sigmaR REF = 0.2163",
+  "Stock status during open-loop", "Obtained directly from the OM",
+  "Assessment during open-loop", "None",
+  "Blim", "4721 t",
+  "Bpa", "6561 t"
+)
+
+knitr::kable(
+  reference_configuration,
+  booktabs = TRUE,
+  caption = "Reference Operating Model configuration and open-loop validation design."
+)
+```
+
+### Parameterization of recruitment process error in REF
+
+In the reference configuration, recruitment process error uses a common
+standard deviation, defined as the median of the values estimated for the
+100 conditioned OMs:
+
+\[
+\sigma_R^{REF}
+=
+\operatorname{median}_{i=1,\ldots,100}(\sigma_{R,i})
+=
+0.2163.
+\]
+
+Each OM retains its \(a_i\) and \(b_i\) parameters of the
+Beverton--Holt relationship, whereas \(\sigma_R^{REF}\) is common to the
+1,000 trajectories. During 2025--2054, each trajectory uses an independent
+realization of recruitment process error.
+
+Parameterization with OM-specific \(\sigma_R\) is evaluated separately
+in the robustness analysis and is not part of the REF configuration validated
+in this WD.
+
+## Sources of variability represented in the validation
+
+The validation represents two sources of variability.
+
+**Between-OM variability** arises from historical conditioning. The 100 OMs
+represent alternative stock conditions and retain their biological parameters,
+stock--recruitment parameters, and the components used to project the fishery.
+
+**Within-OM variability** arises from future recruitment process error.
+Each OM is projected using 10 independent realizations during 2025--2054.
+These realizations share the same OM condition and the same
+\(\sigma_R^{REF}=0.2163\), but differ in the sequence of recruitment
+deviations.
+
+The *open-loop* validation does not incorporate assessment error. Stock
+status used during the simulation is obtained directly from the OM.
+Assessment error is subsequently incorporated and validated as part of the
+*closed-loop* MSE implementation.
+
+## Open-loop validation scenarios
+
+Two scenarios were used to validate the OM: no fishing (C0) and a constant
+annual advised catch of 7,000 t (C7000).
+
+### C0: no-fishing control
+
+In C0, advised catch is set to zero during 2025--2054, eliminating fishing
+mortality during the projection. This scenario allows population dynamics to
+be evaluated without interaction with the fishery.
+
+C0 is used to check the evolution of SSB and recruitment, cohort
+propagation, and implementation of the Beverton--Holt relationship and
+recruitment process error.
+
+### C7000: constant advised catch
+
+In C7000, a constant annual advised catch of 7,000 t is prescribed during
+2025--2054. This catch is an input to the fishery component and does not
+directly fix fishing mortality or realized catch. Both are determined during
+the simulation from stock abundance and structure and the fishery dynamics
+implemented in FLBEIA.
+
+C7000 is used to check the response of SSB, fishing mortality, and realized
+catch under a constant advised catch. This scenario is used as a control of
+OM implementation and does not constitute a candidate Management Procedure
+(MP).
+
+## Structural and numerical checks
+
+Before the *open-loop* diagnostics, the integrity of the C0 and C7000
+outputs was checked, including the number of OMs and trajectories, coverage
+of 2025--2054, absence of missing, non-finite, or negative values, and
+compliance with the conditions defined for each scenario.
+
+
+## Historical--projection continuity and projection rules
+
+The transition between 2024 and 2025 was evaluated to check continuity of
+the conditioned OM and application of the rules defined for the projection.
+Equality between values in the two years is not required because some
+variables change as a result of population dynamics or their parameterization
+for 2025--2054.
+
+For the biological component, the transition in SSB and recruitment,
+cohort propagation between Q4 2024 and Q1 2025, and, under C0, survival
+between quarters according to the implemented natural mortality were
+examined. It was also checked that weight at age and natural mortality during
+the projection corresponded to the values defined for each OM and remained
+constant where specified.
+
+For the fishery component, catchability, landings and discards selectivity,
+and the seasonal allocation used during the projection were checked.
+Catchability and quarterly proportions were verified for each OM, including
+their constancy during 2025--2054 and, for seasonal allocation, that the four
+proportions summed to one.
+
+## Biological diagnostics under C0
+
+Under C0, the distribution of SSB and recruitment across the 1,000
+trajectories during 2025--2054 is summarized annually. For both variables,
+the median, 5th and 95th percentiles, and minimum and maximum values are
+calculated. For SSB, the annual proportion of trajectories below
+\(B_{lim}\) and \(B_{pa}\) is also calculated.
+
+### Validation of recruitment process error
+
+Recruitment process error is validated by comparing realized recruitment
+under C0 with the deterministic expectation from the Beverton--Holt
+relationship corresponding to each OM:
+
+\[
+R^{BH}_{y,i} =
+\frac{a_i SSB_{y,i}}
+     {b_i + SSB_{y,i}},
+\]
+
+where \(a_i\) and \(b_i\) are the OM-specific parameters for OM \(i\).
+
+For each year and trajectory, the log residual is calculated as
+
+\[
+e_{y,j} =
+\log\left(
+\frac{R_{y,j}}
+     {R^{BH}_{y,j}}
+\right).
+\]
+
+In the REF configuration, the 1,000 trajectories use a common standard
+deviation of process error,
+
+\[
+\sigma_R^{REF}=0.2163.
+\]
+
+Because recruitment multipliers are generated using a bias-corrected
+lognormal distribution, it is expected that
+
+\[
+E(e) =
+-\frac{1}{2}\left(\sigma_R^{REF}\right)^2
+\]
+
+y
+
+\[
+SD(e) = \sigma_R^{REF}.
+\]
+
+Validation is performed on the 30,000 observations corresponding to 1,000
+trajectories and 30 projection years. The observed mean and standard deviation
+of \(e\) are compared with their expected values. The absence of missing or
+non-finite values is also checked.
+
+## Stock--fishery diagnostics under C7000
+
+Under C7000, realized catch, fishing mortality, and SSB are summarized
+annually across the 1,000 trajectories. Realized catch is compared with the
+annual advised catch of 7,000 t, whereas fishing mortality is obtained from
+the simulation.
+
+### Advised catch attainment
+
+For each year and trajectory, the advised catch attainment ratio is
+calculated as:
+
+\[
+A_{y,j} =
+\frac{C_{y,j}}{7000},
+\]
+
+where \(C_{y,j}\) is the realized catch in year \(y\) and trajectory
+\(j\).
+
+Observations are classified into four attainment intervals:
+\(\geq99\%\), 90--99%, 50--90%, and <50%. For each interval, attainment,
+realized fishing mortality, and SSB are summarized, together with the
+proportion of observations with SSB below \(B_{lim}\) and \(B_{pa}\).
+
+### SSB response
+
+SSB is summarized annually using the median, 5th and 95th percentiles, and
+minimum and maximum values. The annual proportion of trajectories below
+\(B_{lim}\) and \(B_{pa}\) is also calculated.
+
+For each trajectory, it is also recorded whether SSB reaches values below
+\(B_{lim}\), \(B_{pa}\), 1,000 t, or 100 t during 2025--2054. For
+\(B_{lim}\) and \(B_{pa}\), the number of years below each threshold is
+also counted.
+
+### Paired comparison between C7000 and C0
+
+C7000 trajectories reaching SSB below 1,000 t are paired with the
+corresponding C0 trajectories using the same OM and the same realization of
+recruitment process error.
+
+For each paired trajectory under C0, minimum SSB during 2025--2054 is
+calculated and it is recorded whether values below \(B_{lim}\) or
+\(B_{pa}\) are reached. The comparison evaluates the same OM conditions and
+recruitment realizations under C7000 and in the absence of fishing.
+
+# Results
+
+## Structural and numerical checks
+
+The C0 and C7000 scenarios included 100 OMs and 1,000 trajectories per
+scenario, corresponding to 10 realizations per OM. Recruitment, SSB, fishing
+mortality, and catch series covered 2025--2054 and contained no missing,
+non-finite, or negative values. In C0, fishing mortality and catch were zero
+throughout the projection period. In C7000, fishing mortality was positive
+and variable among trajectories, and realized catch did not exceed 7,000 t
+per year.
+
+## Historical--projection continuity
+
+Continuity checks between the historical period and the projection are
+summarized in Table \@ref(tab:results-continuity). Median recruitment was
+7.16 million in 2024 and 7.34 million in 2025. Median SSB was 11,053 t in
+2024 and 13,057 t in 2025.
+
+Under C0, cohort survival between consecutive quarters matched that
+calculated from natural mortality, with a maximum absolute difference of
+\(1.11\times10^{-16}\). Projected weights at age corresponded to the
+OM-specific 2022--2024 means and natural mortality to the values calculated
+using Lorenzen scaling; in both cases, the maximum absolute difference was
+zero.
+
+Natural mortality and catchability remained constant within each OM during
+2025--2054. Landings selectivity was 1 and discards selectivity was 0.
+Seasonal proportions matched the OM-specific 2015--2024 means and summed to
+one, with a maximum absolute deviation of \(1.11\times10^{-16}\).
+
+
+```{r results-continuity, results='asis', tab.cap="Summary of continuity checks between the historical period and the projection."}
+continuity_file <- file.path(tab_dir, "reference_OM_continuity.csv")
+
+if (file.exists(continuity_file)) {
+  table_continuity <- read.csv(continuity_file, check.names = FALSE)
+
+  table_continuity %>%
+    knitr::kable(
+      format = "latex",
+      booktabs = TRUE,
+      longtable = FALSE,
+      escape = TRUE
+      # caption = "Resumen de los controles de continuidad entre el período histórico y la proyección."
+    ) %>%
+    kableExtra::kable_styling(
+      latex_options = c("hold_position"),
+      font_size = 8
+    ) %>%
+    kableExtra::column_spec(1, width = "2.8cm") %>%
+    kableExtra::column_spec(2, width = "5.0cm") %>%
+    kableExtra::column_spec(3, width = "7.0cm")
+} else {
+  cat("*Table pending: run script 13 with export of `reference_OM_continuity.csv`.*")
+}
+```
+
+
+
+## Biological behaviour under C0
+
+Under C0, annual median SSB ranged from 14,027 to 16,880 t during
+2025--2054. Across the 1,000 trajectories and 30 projection years, SSB ranged
+from 7,365 to 40,915 t. The annual proportion of trajectories with SSB below
+\(B_{lim}\) or \(B_{pa}\) was zero throughout the period.
+
+Annual median recruitment ranged from 7.44 to 7.73 million recruits.
+Across all trajectories and projection years, recruitment ranged from 2.79
+to 19.91 million recruits. The temporal evolution of SSB and recruitment
+under C0 is shown in Figure \@ref(fig:fig-open-loop-validation).
+
+
+
+```{r load-c0-results, include=FALSE}
+c0_ssb_file <- file.path(tab_dir, "C0_SSB_summary.csv")
+c0_r_file <- file.path(tab_dir, "C0_recruitment_summary.csv")
+
+if (file.exists(c0_ssb_file)) {
+  C0_SSB_summary <- read.csv(c0_ssb_file, check.names = FALSE)
+}
+
+if (file.exists(c0_r_file)) {
+  C0_R_summary <- read.csv(c0_r_file, check.names = FALSE)
+}
+```
+
+
+## Recruitment process error
+
+The diagnostic included 30,000 log residuals corresponding to the 1,000
+trajectories and 30 projection years. No missing or non-finite values were
+recorded.
+
+Expected and observed values of the mean and standard deviation of the log
+residuals are presented in Table \@ref(tab:results-bh). 
+
+For \(\sigma_R^{REF}=0.216253\), the expected mean was -0.023383 and the
+observed mean was -0.023206, with a difference of 0.000177. The expected
+standard deviation was 0.216253 and the observed value was 0.215726, with a
+difference of -0.000527.
+
+
+```{r results-bh, results='asis', tab.cap="Validation of recruitment process error in the reference Operating Model."}
+bh_file <- file.path(
+  tab_dir,
+  "BH_process_error_summary.csv"
+)
+
+BH_process_summary <- read.csv(
+  bh_file,
+  check.names = FALSE
+)
+
+BH_table <- data.frame(
+  Diagnóstico = c(
+    "Mean log residual",
+    "Standard deviation of log residual"
+  ),
+  Expected = c(
+    BH_process_summary$expected_mean[1],
+    BH_process_summary$expected_sd[1]
+  ),
+  Observed = c(
+    BH_process_summary$observed_mean[1],
+    BH_process_summary$observed_sd[1]
+  ),
+  Difference = c(
+    BH_process_summary$mean_difference[1],
+    BH_process_summary$sd_difference[1]
+  )
+)
+
+knitr::kable(
+  BH_table,
+  format = "latex",
+  digits = 6,
+  booktabs = TRUE,
+  escape = TRUE
+  # caption = paste0(
+  #   "Validación del error de proceso del reclutamiento ",
+  #   "en el Operating Model de referencia."
+  # )
+) %>%
+  kableExtra::kable_styling(
+    latex_options = "hold_position",
+    font_size = 9
+  )
+```
+
+
+
+## Stock--fishery response under C7000
+
+Of the 30,000 year--trajectory observations, 29,409 (98.03%) had advised
+catch attainment equal to or greater than 99%. Attainment was below 99% in
+591 observations (1.97%), below 90% in 220 (0.73%), and below 50% in 157
+(0.52%). Annual median realized catch was 7,000 t during 2025--2054.
+
+For attainment \(\geq99\%\), the proportions of observations with SSB
+below \(B_{lim}\) and \(B_{pa}\) were 0.002 and 0.042, respectively.
+For 90--99% attainment, these proportions were 0.658 and 1.000. In the two
+classes with attainment below 90%, both proportions were 1.000
+(Table \@ref(tab:results-attainment)).
+
+Annual median SSB under C7000 ranged from 10,935 to 13,057 t. The maximum
+annual proportion of trajectories with SSB below \(B_{lim}\) was 0.028,
+recorded in 2049, and the maximum annual proportion below \(B_{pa}\) was
+0.079, recorded in 2048. The temporal evolution of catch, fishing mortality,
+recruitment, and SSB under C0 and C7000 is shown in
+Figure \@ref(fig:fig-open-loop-validation).
+
+```{r results-attainment, results='asis', tab.cap="Advised catch attainment and associated stock and fishery status under C7000."}
+attainment_file <- file.path(tab_dir, "C7000_catch_attainment_by_class.csv")
+
+if (file.exists(attainment_file)) {
+  C7000_attainment_by_class <- read.csv(attainment_file, check.names = FALSE)
+
+  C7000_table <- C7000_attainment_by_class %>%
+    transmute(
+      `Catch attainment` = catch_class,
+      n = n,
+      `Median F` = median_F,
+      `Median SSB (t)` = median_SSB,
+      `P(SSB < Blim)` = p_blim,
+      `P(SSB < Bpa)` = p_bpa
+    )
+
+  C7000_table %>%
+    knitr::kable(
+      format = "latex",
+      digits = 3,
+      booktabs = TRUE,
+      escape = TRUE
+      # caption = "Cumplimiento de la captura aconsejada y estado asociado del stock y la pesquería bajo C7000."
+    ) %>%
+    kableExtra::kable_styling(
+      latex_options = c("hold_position"),
+      font_size = 9
+    )
+}
+```
+
+
+
+
+```{r fig-open-loop-validation, fig.cap="Historical and projected Operating Model trajectories under the C0 and C7000 scenarios. Lines represent annual medians and bands the 5th and 95th percentiles. The vertical line separates the historical period (1989--2024) from the projection (2025--2054). Blim and Bpa are shown in the SSB panel.", out.width="95%", fig.pos="!ht"}
+validation_fig <- file.path(fig_dir, "Fig_reference_OM_validation_C0_C7000.png")
+
+if (file.exists(validation_fig)) {
+  knitr::include_graphics(validation_fig)
+}
+```
+
+
+
+## Trajectories below SSB thresholds and paired comparison with C0
+
+During 2025--2054, 135 of the 1,000 C7000 trajectories (13.5%) had at
+least one year with SSB below \(B_{lim}\), while 469 (46.9%) had at least
+one year with SSB below \(B_{pa}\). Thirteen trajectories (1.3%) had SSB
+below 1,000 t and 12 (1.2%) below 100 t. The maximum number of years with
+SSB below \(B_{lim}\) and \(B_{pa}\) within a trajectory was 26 and 28,
+respectively.
+
+The 13 trajectories with SSB below 1,000 t under C7000 were compared with
+the corresponding trajectories under C0, retaining the same OM and the same
+stochastic recruitment realization. Under C0, minimum SSB for these 13
+trajectories ranged from 7,365 to 11,914 t. None had SSB below
+\(B_{lim}\) or \(B_{pa}\).
+
+# Reproducibility
+
+The *open-loop* validation is run using the scripts
+`12_RUN_OM_Reference_for_validation_OM.R` and
+`13_VALIDATE_REFERENCE_OM.R`.
+
+`12_RUN_OM_Reference_for_validation_OM.R` uses the conditioned OM objects
+to run the C0 and C7000 scenarios. Each scenario is distributed across
+10 blocks of 100 trajectories. The associated mapping files retain the
+correspondence between each trajectory, its source OM, and the stochastic
+replicate.
+
+`13_VALIDATE_REFERENCE_OM.R` combines the 10 blocks of each scenario,
+reconstructs the identity of the 1,000 trajectories, and performs the
+structural, continuity, biological, and fishery behaviour checks described
+in this WD. Figures are stored in `outputs/OM/` and the tables used in the
+document in `outputs/OM/tables/`.
+
+The computational sequence is:
+
+\[
+\begin{aligned}
+&\texttt{12\_RUN\_OM\_Reference\_for\_validation\_OM.R} \\
+&\downarrow \\
+&\begin{cases}
+\texttt{OM\_validation\_C0\_block\_01...10.rds} \\
+\texttt{OM\_validation\_C7000\_block\_01...10.rds}
+\end{cases} \\
+&\downarrow \\
+&\texttt{13\_VALIDATE\_REFERENCE\_OM.R} \\
+&\downarrow \\
+&\begin{cases}
+\text{figures} \\
+\text{CSV tables} \\
+\text{validation diagnostics}
+\end{cases}
+\end{aligned}
+\]
+
+The R Markdown does not rerun the simulations or recalculate the
+diagnostics. Numerical results, tables, and figures are obtained from the
+outputs generated by the preceding scripts, maintaining correspondence
+between code, output, and the reported result.
+
+# Conclusions
+
+- Continuity between the historical period and the projection indicates that
+  population dynamics during 2025--2054 retain the biological and fishery
+  rules defined during OM conditioning. Projected changes in SSB and
+  recruitment therefore result from the simulated dynamics and the applied
+  fishing mortality.
+
+- In the absence of fishing, no trajectory had SSB below \(B_{lim}\) or
+  \(B_{pa}\). Under the natural mortality, stock--recruitment relationship,
+  and recruitment variability defined for REF, the population remained above
+  both limits throughout the projection period.
+
+- The correspondence between the observed and expected distributions of
+  recruitment residuals indicates that the interannual variability applied
+  around the Beverton--Holt relationship reproduces the process error
+  specified for REF. This variability generates years with recruitment above
+  and below the expectation associated with the SSB of each OM.
+
+- Under C7000, the reduction in SSB coincided with an increase in the fishing
+  mortality required to approach the advised catch. At low SSB levels, the
+  system failed to attain 7,000 t in some trajectories. This behaviour
+  reflects the dependence of realizable catch on available biomass and
+  fishing mortality.
+
+- Trajectories that reached SSB below 1,000 t under C7000 remained above
+  \(B_{pa}\) in their corresponding C0 trajectories. By retaining the same
+  OM and the same stochastic recruitment realization, this comparison
+  indicates that the low SSB values observed under C7000 result from the
+  interaction between fishing pressure and population dynamics, rather than
+  from those same recruitment realizations in the absence of fishing.
+
+Overall, the *open-loop* validation shows that the reference OM represents
+population dynamics in the absence of fishing, the recruitment variability
+defined for REF, and the stock response to fishing pressure. These results
+support use of the OM as the basis for *closed-loop* implementation. C7000
+is used as a validation scenario and does not, by itself, allow inference
+about the sustainability of an annual catch of 7,000 t or the performance
+of a Management Procedure.
+
+# References

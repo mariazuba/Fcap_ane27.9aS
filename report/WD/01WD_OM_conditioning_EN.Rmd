@@ -1,0 +1,644 @@
+---
+title: "Operating Model conditioning for the shortcut MSE of ane.27.9aS"
+
+author:
+  - "María José Zúñiga"
+  - "Fernando Ramos"
+  - "María Ángeles Gamaza ..."
+
+date: "`r format(Sys.Date(), '%d-%m-%Y')`"
+
+output:
+  bookdown::pdf_document2:
+    toc: false
+    toc_depth: 3
+    number_sections: true
+    keep_tex: false
+
+bibliography: report_biblio.bib
+csl: ices-journal-of-marine-science.csl
+link-citations: true
+---
+
+
+**Working Document 01 — WKSPSIM 2026**
+
+**Stock:** Anchovy (*Engraulis encrasicolus*) in the southern part of Division 9.a  
+(Gulf of Cadiz and southern part of Portugal), ane.27.9aS
+
+**Affiliation:** Instituto Español de Oceanografía (IEO-CSIC), Centro Oceanográfico de Cádiz, Spain
+
+
+```{r setup, include=FALSE}
+library(knitr)
+library(here)
+library(FLCore)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+fig_dir <- here("outputs","bootstrap")
+rds_dir <- here("data","Rdata")
+
+knitr::opts_chunk$set(
+  echo=FALSE,
+  warning=FALSE,
+  message=FALSE,
+  fig.align="center"
+)
+```
+
+
+# General approach
+
+The Operating Model (OM) used in the present shortcut Management Strategy Evaluation (MSE) is based on the framework developed for the southern component of anchovy in Division 9.a within the Math4Fish project and presented at WGHANSA 2023 [@Perez2023Math4Fish; @ICES2023WGHANSA]. In that MSE, implemented in FLBEIA [@Garcia2017FLBEIA], the OM was conditioned from the Gadget assessment available at that time.
+
+In the present work, the OM was conditioned from the 2024 SS3 assessment of ane.27.9aS conducted at WGHANSA 2024 [@ICES2024WGHANSA], using the configuration adopted during WKBANSP [@ICES2024WKBANSP].
+
+The OM includes ages 0–3+ and four seasons per year. The historical period spans 1989–2024 and the projection period 2025–2054. SSB is determined in Q2 and age-0 recruitment enters in Q3, consistent with the temporal structure of the reference assessment [@ICES2024WKBANSP; @ICES2025StockAnnex9aS].
+
+# Methods
+
+## Conditioning using the SS3 bootstrap
+
+### Parametric bootstrap of SS3 observations
+
+The observations used in the SS3 likelihood function were
+simulated using the parametric bootstrap implemented in SS3
+[@Methot2013], using the probability distributions and error structures
+defined in the reference assessment.
+
+The bootstrap was applied to abundance indices, catches, and
+age compositions. Each generated dataset was used to refit SS3
+while retaining the configuration of the reference assessment.
+
+### Bootstrap of weight-at-age
+
+Historical mean weight-at-age is incorporated into SS3 through the external
+`wtatage.ss` file and was treated independently from the observations generated
+through the SS3 bootstrap. The following files were used to construct the
+weight-at-age realizations:
+
+- `boot/data/Watege_fun/wage_seine_2.csv`;
+- `boot/data/Watege_fun/wage_pela.csv`;
+- `boot/data/Watege_fun/wage_eco.csv`;
+- `boot/data/Watege_fun/wage_ecoR.csv`.
+
+Observations were restricted to the 1989--2024 period and to positive,
+non-missing weight values. Ages 1--3 were used for Q1 and Q2, whereas ages
+0--3 were used for Q3 and Q4. In Q4, age-3 observations with
+`log(weight) < 3` were excluded before fitting.
+
+For each quarter, a linear mixed-effects model was fitted independently
+using `lme4` [@Bates2015]:
+
+\[
+\log(W_{a,y,q}) =
+\beta_{0,q}+\beta_{a,q}+u_{y,q}+\varepsilon_{a,y,q},
+\]
+
+donde \(W_{a,y,q}\) es el peso observado para la edad \(a\), el año \(y\) y el
+trimestre \(q\); \(\beta_{0,q}\) es el intercepto; \(\beta_{a,q}\) representa
+el efecto fijo de la edad; \(u_{y,q}\) corresponde al efecto aleatorio del año;
+y \(\varepsilon_{a,y,q}\) es el error residual. En R, el modelo se especificó
+como `log(weight) ~ age + (1 | year)` y se ajustó mediante REML.
+
+The parametric bootstrap was generated using
+`bootMer(..., type = "parametric", use.u = FALSE)`. A total of 150
+weight-at-age realizations were generated for each quarter. Seeds
+101, 102, 103, and 104 were used for Q1--Q4, respectively, together with seed
+20260808 defined in the script.
+
+Predicted weights were transformed back to the original scale and
+converted from grams to kilograms:
+
+\[
+W=\frac{\exp(\widehat{\log W})}{1000}.
+\]
+
+Quarterly realizations were reformatted following the structure of
+`wtatage.ss` and stored as `wtatage_boot_*.ss`. The complete set of
+realizations was also saved in `weight_at_age_bootstrap.rds`.
+
+### Combination and refitting of bootstrap datasets
+
+For each refit, a bootstrap dataset of SS3 observations was combined
+with the corresponding weight-at-age realization. SS3 was run retaining
+the same configuration used in the reference assessment. Parameters
+estimated by the assessment, including recruitment, catchability,
+selectivity, and fishing mortality components, were re-estimated in each
+fit.
+
+### Filtering and selection of SS3 refits
+
+SS3 runs were reviewed using model outputs and console files. A refit was
+considered eligible for OM conditioning when the maximum gradient component
+was less than or equal to 0.001 and the calculations associated with the
+Hessian and standard errors were completed.
+
+In the implementation, the Hessian check required evidence that its inversion
+had started, that standard-error calculations had started, and that the
+`covar.sso` file had been generated. In addition, the model output had to be
+readable using `r4ss`.
+
+The criterion used was:
+
+\[
+\texttt{model\_ok}
+=
+\texttt{read\_ok}
+\land
+\texttt{gradient\_ok}
+\land
+\texttt{hessian\_ok}.
+\]
+
+From the eligible refits, 100 realizations were selected using
+`slice_sample(n = 100)` with `set.seed(123)`. The selected bootstrap
+identifiers were ordered before conversion to FLR objects. The seed was kept
+fixed to reproduce the selection from the same set of eligible refits.
+
+## Conversion of SS3 to FLR objects
+
+Each selected SS3 refit was converted to FLR objects using the
+`read_ss3_to_flbeia()` function implemented in `scripts/03_read_ss3_to_flbeia.R`.
+The function reads SS3 outputs using `r4ss` and `ss3om` and generates:
+
+- an `FLStock` object containing historical population and fishery variables;
+- an `FLSR` object containing stock--recruitment information transferred from SS3;
+- `FLIndex` objects corresponding to the indices used in the assessment.
+
+The `harvest` slot of the `FLStock` was replaced by fishing mortality-at-age
+estimated by SS3, and index selectivity patterns were reconstructed from model
+outputs. The range used for Fbar was set to age 3.
+
+In this WD, the `FLStock` objects are used to construct the historical
+conditioning of the OM. Conditioning of the stock--recruitment relationship is
+described separately in WD 02.
+
+## Construction of the historical OM ensemble
+
+The 100 selected `FLStock` objects were stored in `stk_boot_100.rds`.
+The correspondence between each object and the SS3 bootstrap identifier was
+recorded in `iteration_map.csv`.
+
+The `04_build_historical_conditioning.R` script combined the 100 objects in
+the `iter` dimension of a single `FLStock`. For each iteration,
+`stock.n`, `stock.wt`, `m`, `mat`, `harvest`, `harvest.spwn`, `m.spwn`,
+`catch.n`, `catch.wt`, `landings.n`, `landings.wt`, `discards.n`, and
+`discards.wt` were transferred from the corresponding object.
+
+During construction, checks verified that 100 `FLStock` objects and
+100 records in `iteration_map.csv` existed, that bootstrap identifiers
+retained the order defined in the map, and that the selected slots matched
+the source objects for each iteration. The resulting object was stored as
+`stk_conditioned_100iter.rds`.
+
+## FLBiol conditioning and biological projection
+
+### Spawning timing and maturity
+
+The `05_build_FLBiol_from_boot_conditioning.R` script converts the conditioned
+historical `FLStock` into the `FLBiol` used to represent the biological
+population during the simulations.
+
+Before conversion, `harvest.spwn` and `m.spwn` were set to 1 in Q1 and
+0 in Q2--Q4, so that mortalities corresponding to Q1 are applied before SSB is
+calculated in Q2. Age 0 was considered immature. Maturity was set to zero in
+Q1, Q3, and Q4, so that the contribution to SSB occurs in Q2.
+
+The `FLBiol` was constructed using:
+
+```text
+n    <- stock.n
+wt   <- stock.wt
+m    <- m
+spwn <- m.spwn
+mat  <- mat
+fec  <- 1
+```
+
+### Projected weight-at-age
+
+The biological object is extended to 2054. For each OM iteration, age, and season, projected weight-at-age is set to the 2022--2024 mean:
+
+\[
+W^{\mathrm{proj}}_{a,q,i}
+=
+\frac{1}{3}
+\sum_{y=2022}^{2024}W_{a,q,y,i}.
+\]
+
+The resulting value is applied throughout the 2025--2054 period. The script checks the exact transfer of historical weights from `FLStock` to `FLBiol` and agreement of projected values with the 2022--2024 mean using a maximum absolute-difference tolerance of \(10^{-10}\).
+
+### Projected natural mortality
+
+Projected natural mortality is linked to the OM-specific projected weight-at-age through the body-weight scaling of @Lorenzen1996. The annual natural mortality values used as reference were those corresponding to the ane.27.9aS assessment configuration [@ICES2024WKBANSP; @ICES2025StockAnnex9aS]:
+
+\[
+M_{a,\mathrm{ref}}=(2.97,\;1.60,\;2.48,\;2.48)
+\]
+
+for ages 0, 1, 2, and 3+, respectively. With four seasonal steps per year,
+
+\[
+M^{(q)}_{a,\mathrm{ref}}=\frac{M_{a,\mathrm{ref}}}{4}.
+\]
+
+Para la iteración del OM \(i\), la edad \(a\) y la estación \(q\),
+
+\[
+M_{a,q,i}
+=
+M^{(q)}_{a,\mathrm{ref}}
+\left(
+\frac{W_{a,q,\mathrm{ref}}}{W_{a,q,i}}
+\right)^{0.288},
+\]
+
+where \(W_{a,q,\mathrm{ref}}\) is the 2022--2024 mean weight from the base-assessment object and \(W_{a,q,i}\) is the corresponding projected weight in OM iteration \(i\). When either weight is non-finite or non-positive, the seasonal reference value is retained. The value calculated for 2025 is applied during 2025--2054 and its temporal constancy is checked explicitly.
+
+### Maturity, fecundity, and spawning-related variables
+
+For 2025--2054, `mat`, `fec`, and `spwn` are extended using their 2022--2024 means. Given the configuration above, this operation preserves the Q2 maturity structure, the unit fecundity multiplier, and the temporal spawning structure.
+
+The final objects from this stage are `ane_stock_conditioned_100iter.rds`, `biols_conditioned_100iter.rds`, `M_future_summary.rds`, `weight_projection_bootstrap.rds`, and `M_projection_bootstrap.rds`.
+
+# Results
+
+## Bootstrap datasets used for conditioning
+
+The bootstrap procedure generated alternative realizations of the
+observations used in the SS3 assessment and of historical weight-at-age.
+The datasets corresponding to the selected refits were subsequently
+used to condition the historical OM realizations.
+
+The following figures compare the selected bootstrap datasets
+with the expected values from the reference SS3 model. These comparisons
+are diagnostics of the dataset used for conditioning and
+do not form part of the refit selection criteria.
+
+### Abundance indices and catch
+
+Bootstrap realizations of the abundance indices were generated for the
+indices included in the reference SS3 assessment
+(Figure \@ref(fig:bootstrap-indices)). For each index, the selected realizations
+correspond to the observation datasets used in the SS3 refits.
+
+```{r bootstrap-indices, fig.cap="Historical survey indices and bootstrap realizations used for OM conditioning. Trajectories represent the selected bootstrap datasets, and the black line and points represent expected values from the base SS3 model. Panels correspond to the indices included in the assessment.", out.width="90%"}
+if (file.exists(file.path(fig_dir,"bootstrap_indices.png"))) {
+  knitr::include_graphics(file.path(fig_dir,"bootstrap_indices.png"))
+}
+```
+
+Bootstrap catch realizations were generated for Q1--Q4
+(Figure \@ref(fig:bootstrap-catch)) and incorporated as catch observations
+in the corresponding refits.
+
+```{r bootstrap-catch, fig.cap="Historical catch and bootstrap realizations by quarter. Trajectories represent the selected bootstrap datasets, and the black line and points represent the catch series from the base SS3 model. Panels correspond to Q1--Q4.", out.width="90%"}
+if (file.exists(file.path(fig_dir,"bootstrap_catch.png"))) {
+  knitr::include_graphics(file.path(fig_dir,"bootstrap_catch.png"))
+}
+```
+
+
+### Age compositions
+
+The age compositions generated by bootstrap correspond to SEINE
+Q1--Q4 and the PELAGO and ECOCADIZ surveys. Figures
+\@ref(fig:agecomp-seine-q1)--\@ref(fig:agecomp-ecocadiz) show the
+realizations used in the selected refits and the corresponding expected values
+from the reference SS3 model.
+
+```{r agecomp-seine-q1, fig.cap="Bootstrap realizations of SEINE Q1 age compositions. Lines represent the selected bootstrap datasets, and the black line and points represent the expected age composition from the base SS3 model.", out.width="95%"}
+f <- file.path(fig_dir,"bootstrap_agecomp_SEINE_Q1.png")
+if (file.exists(f)) knitr::include_graphics(f)
+```
+
+```{r agecomp-seine-q2, fig.cap="Bootstrap realizations of SEINE Q2 age compositions. Lines represent the selected bootstrap datasets, and the black line and points represent the expected age composition from the base SS3 model.", out.width="95%"}
+f <- file.path(fig_dir,"bootstrap_agecomp_SEINE_Q2.png")
+if (file.exists(f)) knitr::include_graphics(f)
+```
+
+```{r agecomp-seine-q3, fig.cap="Bootstrap realizations of SEINE Q3 age compositions. Lines represent the selected bootstrap datasets, and the black line and points represent the expected age composition from the base SS3 model.", out.width="95%"}
+f <- file.path(fig_dir,"bootstrap_agecomp_SEINE_Q3.png")
+if (file.exists(f)) knitr::include_graphics(f)
+```
+
+```{r agecomp-seine-q4, fig.cap="Bootstrap realizations of SEINE Q4 age compositions. Lines represent the selected bootstrap datasets, and the black line and points represent the expected age composition from the base SS3 model.", out.width="95%"}
+f <- file.path(fig_dir,"bootstrap_agecomp_SEINE_Q4.png")
+if (file.exists(f)) knitr::include_graphics(f)
+```
+
+```{r agecomp-pelago, fig.cap="Bootstrap realizations of age compositions from the PELAGO survey. Lines represent the selected bootstrap datasets, and the black line and points represent the expected age composition from the base SS3 model.", out.width="95%"}
+f <- file.path(fig_dir,"bootstrap_agecomp_PELAGO.png")
+if (file.exists(f)) knitr::include_graphics(f)
+```
+
+```{r agecomp-ecocadiz, fig.cap="Bootstrap realizations of age compositions from the ECOCADIZ survey. Lines represent the selected bootstrap datasets, and the black line and points represent the expected age composition from the base SS3 model.", out.width="95%"}
+f <- file.path(fig_dir,"bootstrap_agecomp_ECOCADIZ.png")
+if (file.exists(f)) knitr::include_graphics(f)
+```
+
+
+### Historical bootstrap of weight-at-age
+
+Historical weight-at-age realizations were generated independently
+of the bootstrap of SS3 observations. For each selected refit, the
+corresponding realization was incorporated through the `wtatage.ss` file.
+
+Figure \@ref(fig:bootstrap-weight) shows the historical weight-at-age
+trajectories used in the selected refits, together with the values
+used in the reference SS3 model.
+
+```{r bootstrap-weight, fig.cap="Historical weight-at-age trajectories used in the selected SS3 bootstrap refits. Lines represent bootstrap-specific weight-at-age inputs, and the black line and points represent the base SS3 input. Panels are arranged by age and quarter.", out.width="95%"}
+if (file.exists(file.path(fig_dir,"bootstrap_weight_at_age.png"))) {
+  knitr::include_graphics(file.path(fig_dir,"bootstrap_weight_at_age.png"))
+}
+```
+
+
+## Historical trajectories from the selected SS3 refits
+
+The selected refits provided 100 realizations of the variables
+estimated by SS3. These realizations form the basis for constructing the
+historical OM trajectories. Results for numbers-at-age, SSB, recruitment,
+fishing mortality, selectivity, and catchability are presented below,
+together with the values from the reference SS3 model.
+
+### Numbers-at-age
+
+Figures \@ref(fig:natage-q1)--\@ref(fig:natage-q4) show the numbers-at-age
+estimated for Q1--Q4 in the 100 selected refits. These trajectories were
+subsequently transferred to the historical `stock.n` component of each OM.
+
+```{r natage-q1, fig.cap="Historical numbers-at-age in Q1 for the 100 selected SS3 bootstrap refits. Lines represent bootstrap trajectories, and the black line and points represent the base SS3 model. Panels correspond to ages 0--3+.", out.width="95%"}
+f <- file.path(fig_dir,"bootstrap_natage_season1.png")
+if (file.exists(f)) knitr::include_graphics(f)
+```
+
+```{r natage-q2, fig.cap="Historical numbers-at-age in Q2 for the 100 selected SS3 bootstrap refits. Lines represent bootstrap trajectories, and the black line and points represent the base SS3 model. Panels correspond to ages 0--3+.", out.width="95%"}
+f <- file.path(fig_dir,"bootstrap_natage_season2.png")
+if (file.exists(f)) knitr::include_graphics(f)
+```
+
+```{r natage-q3, fig.cap="Historical numbers-at-age in Q3 for the 100 selected SS3 bootstrap refits. Lines represent bootstrap trajectories, and the black line and points represent the base SS3 model. Panels correspond to ages 0--3+.", out.width="95%"}
+f <- file.path(fig_dir,"bootstrap_natage_season3.png")
+if (file.exists(f)) knitr::include_graphics(f)
+```
+
+```{r natage-q4, fig.cap="Historical numbers-at-age in Q4 for the 100 selected SS3 bootstrap refits. Lines represent bootstrap trajectories, and the black line and points represent the base SS3 model. Panels correspond to ages 0--3+.", out.width="95%"}
+f <- file.path(fig_dir,"bootstrap_natage_season4.png")
+if (file.exists(f)) knitr::include_graphics(f)
+```
+
+### SSB and recruitment
+
+Figures \@ref(fig:bootstrap-ssb) and
+\@ref(fig:bootstrap-recruitment) show the historical SSB and recruitment
+trajectories estimated by the 100 selected refits. SSB corresponds to
+spawning-stock biomass calculated in Q2, and recruitment to the entry of
+age 0 in Q3.
+
+```{r bootstrap-ssb, fig.cap="Historical spawning-stock biomass in the 100 selected SS3 bootstrap refits. Lines represent bootstrap trajectories, and the black line and points represent the base SS3 model.", out.width="80%"}
+if (file.exists(file.path(fig_dir,"bootstrap_ssb.png"))) {
+  knitr::include_graphics(file.path(fig_dir,"bootstrap_ssb.png"))
+}
+```
+
+```{r bootstrap-recruitment, fig.cap="Historical recruitment in the 100 selected SS3 bootstrap refits. Lines represent bootstrap trajectories, and the black line and points represent the base SS3 model.", out.width="80%"}
+if (file.exists(file.path(fig_dir,"bootstrap_recruitment.png"))) {
+  knitr::include_graphics(file.path(fig_dir,"bootstrap_recruitment.png"))
+}
+```
+
+
+### Fishing mortality
+
+Figure \@ref(fig:bootstrap-F) shows the historical trajectories of
+fishing mortality estimated for SEINE Q1--Q4 in the 100 selected
+refits. These estimates were used to construct the historical `harvest`
+component of each OM.
+
+```{r bootstrap-F, fig.cap="Historical fishing mortality in the 100 selected SS3 bootstrap refits. Lines represent bootstrap trajectories, and the black line and points represent the base SS3 model. Panels correspond to SEINE Q1--Q4.", out.width="95%"}
+if (file.exists(file.path(fig_dir,"bootstrap_F.png"))) {
+  knitr::include_graphics(file.path(fig_dir,"bootstrap_F.png"))
+}
+```
+
+
+### Fleet and survey selectivity
+
+Figures \@ref(fig:bootstrap-selectivity-seine) and
+\@ref(fig:bootstrap-selectivity-surveys) show the estimates of
+selectivity-at-age obtained in the selected refits for SEINE
+Q1--Q4 and for the survey indices included in SS3.
+
+```{r bootstrap-selectivity-seine, fig.cap="Selectivity-at-age of the SEINE fleet in the selected SS3 bootstrap refits. Selectivity-at-age is shown for Q1--Q4. Lines represent bootstrap refits, and the black line and points represent the base SS3 model.", out.width="95%"}
+if (file.exists(file.path(fig_dir,"bootstrap_selectivity_SEINE.png"))) {
+  knitr::include_graphics(file.path(fig_dir,"bootstrap_selectivity_SEINE.png"))
+}
+```
+
+```{r bootstrap-selectivity-surveys, fig.cap="Survey selectivity-at-age in the selected SS3 bootstrap refits. Panels correspond to PELAGO 1999--2024 and the two ECOCADIZ periods, 2004--2014 and 2015--2023. Lines represent bootstrap refits, and the black line and points represent the base SS3 model.", out.width="95%"}
+if (file.exists(file.path(fig_dir,"bootstrap_selectivity_surveys.png"))) {
+  knitr::include_graphics(file.path(fig_dir,"bootstrap_selectivity_surveys.png"))
+}
+```
+
+### Survey catchability
+
+Figure \@ref(fig:bootstrap-catchability) shows the catchability estimates
+obtained for each index in the 100 selected refits, together with the
+corresponding estimates from the reference SS3 model.
+
+The figures above are used as descriptive diagnostics of the selected set of
+refits. The criteria used for filtering and selection are those defined in the
+Methods section.
+
+```{r bootstrap-catchability, fig.cap="Catchability estimates in the selected SS3 bootstrap refits. Points represent bootstrap-specific estimates, and black points represent the base SS3 model estimates for the survey indices.", out.width="75%"}
+if (file.exists(file.path(fig_dir,"bootstrap_catchability.png"))) {
+  knitr::include_graphics(file.path(fig_dir,"bootstrap_catchability.png"))
+}
+```
+
+## Transfer to the 100-iteration historical FLStock
+
+The 100 selected SS3 refits were converted to `FLStock` objects and
+subsequently combined in the `iter` dimension of a single object. The
+resulting `FLStock` contains 100 iterations and retains for each one the
+correspondence with the SS3 bootstrap identifier recorded in
+`iteration_map.csv`.
+
+The transfer included the historical population and fishery variables
+subsequently used for OM conditioning: numbers- and weight-at-age,
+natural mortality, maturity, fishing mortality, spawning-timing variables,
+catches, landings, and discards.
+
+The checks performed during construction compared, for each iteration, the
+selected slots of the combined object with those of the corresponding source
+`FLStock`. No differences exceeding the tolerances defined in these checks
+were detected.
+
+```{r iteration-map-table, results='asis'}
+map_file <- file.path(rds_dir,"iteration_map.csv")
+if (file.exists(map_file)) {
+  iteration_map_wd <- read.csv(map_file)
+  knitr::kable(
+    head(iteration_map_wd,10),
+    caption="First ten entries of the bootstrap--OM iteration mapping used to preserve the correspondence between the selected SS3 refits and the conditioned FLStock."
+  )
+}
+```
+
+## Conditioning of the biological projection
+
+The 100 historical `FLStock` objects were used to construct the 100 iterations
+of the `FLBiol` representing the biological component of the OM. Historical
+variables were transferred through 2024 and the object was subsequently
+extended to 2054 using the projection assumptions defined in Methods.
+
+### Weight-at-age
+
+For each iteration, age, and quarter, the weight-at-age used during
+2025--2054 corresponds to the mean of the 2022--2024 values from that same
+iteration. As a result, each OM retains during the projection a specific set
+of weight-at-age values derived from its historical trajectory.
+
+Figure \@ref(fig:projected-weight-at-age) shows the weight-at-age values
+obtained for the 100 iterations and the corresponding values from the
+reference assessment.
+
+```{r projected-weight-at-age, fig.cap="Historical and projected weight-at-age in the 100 conditioned OMs. Values are shown by age and quarter. The vertical dashed line indicates the transition between historical conditioning (through 2024) and projection (2025--2054). Projected weight-at-age is fixed within each OM at its 2022--2024 mean.", out.width="90%", fig.align="center"}
+
+fig_file <- here("outputs","OM","Fig13a_stock_weight_historical_projection.png")
+
+if (file.exists(fig_file)) {knitr::include_graphics(fig_file)}
+```
+
+### Natural mortality
+
+Projected natural mortality was calculated for each iteration from the
+projected weight-at-age and the reference values defined in Methods.
+The calculation was performed for 2025 and the resulting values were kept
+constant during 2025--2054.
+
+Figure \@ref(fig:projected-M-at-age) shows the resulting natural mortality by
+age and quarter for the 100 iterations, together with the values used in
+the reference assessment.
+
+Table \@ref(tab:M-summary-table) summarizes the distribution of natural
+mortality values obtained across the 100 iterations for each age and
+quarter.
+
+```{r projected-M-at-age, fig.cap="Historical and projected natural mortality-at-age in the 100 conditioned OMs. Values are shown by age and quarter. The vertical dashed line indicates the transition between historical conditioning (through 2024) and projection (2025--2054). From 2025 onward, natural mortality is scaled according to the OM-specific projected weight-at-age using the Lorenzen relationship and is kept constant over time within each OM.", out.width="90%",fig.align="center"}
+  
+if (file.exists(here("outputs","OM","Fig13b_M_historical_projection.png"))) {
+  knitr::include_graphics(here("outputs","OM","Fig13b_M_historical_projection.png"))
+}
+
+```
+
+
+
+```{r M-summary-table, results='asis'}
+m_file <- file.path(rds_dir,"M_future_summary.rds")
+
+if (file.exists(m_file)) {
+  M_wd <- readRDS(m_file)
+  knitr::kable(
+    M_wd,
+    digits=3,
+    caption="Distribution of projected seasonal natural mortality across the 100 conditioned OMs in 2025. The same OM-specific values are applied during 2025--2054."
+  )
+}
+```
+
+Implementation checks establish that historical weight is transferred from `FLStock` to `FLBiol` within the specified numerical tolerance, that projected weight corresponds to the OM-specific 2022--2024 mean, and that projected natural mortality is temporally constant within each OM.
+
+# Reproducibility {#reproducibility}
+
+The OM conditioning component is generated using the following scripts, executed sequentially:
+
+1. `01_bootstrap_watage.R` -- generates 150 alternative historical weight-at-age trajectories and the SS3 `wtatage.ss` inputs.
+2. `02_bootstrap_ss3.R` -- generates and runs the SS3 bootstrap refits, checks model outputs, selects 100 eligible refits, and converts them to FLR objects.
+3. `02b_bootstrap_ss3_plots.R` -- generates diagnostic figures for the selected conditioning ensemble; this script is diagnostic and does not modify the conditioned objects.
+4. `03_read_ss3_to_flbeia.R` -- auxiliary function loaded by script 02 to convert each executed SS3 refit into `FLStock`, `FLSR`, and `FLIndex` objects.
+5. `04_build_historical_conditioning.R` -- assembles the 100 selected `FLStock` objects into a single 100-iteration historical stock.
+6. `05_build_FLBiol_from_boot_conditioning.R` -- constructs `FLBiol`, configures spawning and maturity, and extends biological variables to 2054.
+
+The computational dependency is
+
+\[
+\texttt{weight-at-age data}
+\rightarrow
+\texttt{wtatage\_boot}
+\rightarrow
+\texttt{SS3 bootstrap refits}
+\rightarrow
+\texttt{stk\_boot\_100.rds}
+\rightarrow
+\texttt{stk\_conditioned\_100iter.rds}
+\rightarrow
+\texttt{biols\_conditioned\_100iter.rds}.
+\]
+
+The weight-at-age bootstrap simulations use seeds 101--104, together with seed 20260808 defined in the script. Selection of the 100 eligible SS3 refits uses seed 123. These stochastic operations can be reproduced when the same inputs, software versions, and eligible SS3 runs are available.
+
+The SS3 refitting stage requires the SS3 executable and the complete input files of the benchmark model. Therefore, full reproduction also requires documentation of the SS3 executable and version used in the analysis. The R workflow depends on `r4ss`, `ss3om`, `FLCore`, `FLBEIA`, `lme4`, `tidyverse`, and their associated packages.
+
+```{r reproducibility-files}
+required_objects <- c(
+  "stk_boot_100.rds",
+  "iteration_map.csv",
+  "stk_conditioned_100iter.rds",
+  "ane_stock_conditioned_100iter.rds",
+  "biols_conditioned_100iter.rds",
+  "M_future_summary.rds",
+  "weight_projection_bootstrap.rds",
+  "M_projection_bootstrap.rds"
+)
+
+repro_table <- data.frame(
+  object=required_objects,
+  exists=file.exists(file.path(rds_dir,required_objects))
+)
+
+knitr::kable(
+  repro_table,
+  caption="Main intermediate and final objects used by the OM conditioning workflow and their availability in the current project directory."
+)
+```
+
+The scripts contain explicit checks of the number and order of the selected historical conditions, the correspondence between assembled iterations and their source `FLStock` objects, the transfer of historical weight-at-age, the correspondence between projected weight and the 2022--2024 mean, and the temporal constancy of projected natural mortality within an OM.
+
+# Conclusions
+
+- The historical conditioning of the *ane.27.9aS* OM is based on the 2024
+  SS3 assessment conducted at WGHANSA 2024, using the SS3 configuration adopted during
+  WKBANSP. The historical period spans 1989--2024 and retains the age and
+  seasonal structure of the reference assessment [@ICES2024WGHANSA; @ICES2025WGHANSA; @ICES2024WKBANSP].
+
+- Variability among the historical OM conditions is generated through
+  the parametric bootstrap of the observations used by SS3 and an
+  independent bootstrap of historical weight-at-age. Each set of
+  observations is used to perform a new SS3 fit while retaining the
+  reference assessment configuration.
+
+- A total of 100 SS3 refits were selected and transferred to FLR objects. The
+  resulting historical trajectories were combined into a single 100-iteration
+  `FLStock`, maintaining the correspondence between each iteration and the
+  SS3 bootstrap from which it originated.
+
+- The biological component of the OM is represented by a 100-iteration
+  `FLBiol`. SSB is determined in Q2, age 0 is considered immature, and
+  fecundity is represented by a multiplier equal to one.
+
+- For 2025--2054, the weight-at-age of each OM is fixed at its
+  2022--2024 mean. Natural mortality is calculated for each OM from this
+  weight using Lorenzen scaling and is kept constant throughout the
+  projection period [@Lorenzen1996].
+  
+Stock--recruitment conditioning and the incorporation of recruitment process error are documented in WD02.
+
+# References

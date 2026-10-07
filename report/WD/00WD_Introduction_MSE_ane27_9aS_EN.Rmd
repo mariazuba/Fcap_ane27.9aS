@@ -1,0 +1,154 @@
+---
+title: "Background and management context for the MSE of anchovy (ane.27.9aS)"
+author:
+  - "María José Zúñiga"
+  - "Fernando Ramos"
+  - "María Ángeles Gamaza"
+date: "October 2026"
+lang: en
+output:
+  bookdown::pdf_document2:
+    toc: false
+    number_sections: true
+    keep_tex: false
+bibliography: report_biblio.bib
+csl: ices-journal-of-marine-science.csl
+link-citations: true
+---
+
+**Working Document 00 — WKSPSIM 2026**
+
+**Stock:** Anchovy (*Engraulis encrasicolus*) in the southern part of Division 9.a  
+(Gulf of Cadiz and southern part of Portugal), ane.27.9aS
+
+**Affiliation:** Instituto Español de Oceanografía (IEO-CSIC), Centro Oceanográfico de Cádiz, Spain
+
+```{r setup, include=FALSE}
+library(knitr)
+library(here)
+library(FLCore)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+fig_dir <- here("report","WD","figures")
+
+knitr::opts_chunk$set(
+  echo=FALSE,
+  warning=FALSE,
+  message=FALSE,
+  fig.align="center"
+)
+```
+
+
+# Assessment and advice history
+
+European anchovy (*Engraulis encrasicolus*) is a short-lived species, with rapid growth and high interannual variability in recruitment. These characteristics result in substantial fluctuations in stock abundance and increase the uncertainty associated with its assessment and management. For this type of stock, it is particularly important to reduce, as far as possible, the time lag between data collection, assessment, advice, and implementation of management measures, so that decisions are based on the most recent information available on stock status [@ICES2019WKDLSSLS; @ICES2020WKDLSSLS2].
+
+The assessment and scientific advice for anchovy in Atlantic Iberian waters are carried out within the ICES Working Group on Southern Horse Mackerel, Anchovy and Sardine (WGHANSA). Since the 2018 WKPELA benchmark, the assessment and management framework for anchovy in Division 9.a has undergone several relevant changes, both in assessment methodology and in stock definition, advice category, and the rules used to set catches [@ICES2018WKPELA; @ICES2018WGHANSA; @ICES2019WGHANSA; @ICES2020WGHANSA; @ICES2021WGHANSA; @ICES2022WGHANSA; @ICES2023WGHANSA] (Figure \@ref(fig:evolution-assessment)).
+
+
+```{r evolution-assessment, fig.cap="Evolution of the assessment and management framework for anchovy in southern Division 9.a (ane.27.9aS), from the 2018 WKPELA benchmark and the Gadget-based assessment to the SS3 assessment adopted at WKBANSP and the subsequent development of an MSE to evaluate management procedures based on Fcap–Bescapement.", out.width="90%"}
+if (file.exists(file.path(fig_dir,"Cronología del proceso de evaluación ANE 27.9a.png"))) {
+  knitr::include_graphics(file.path(fig_dir,"Cronología del proceso de evaluación ANE 27.9a.png"))
+}
+```
+
+
+Following WKPELA 2018, an integrated assessment implemented in Gadget was adopted for anchovy in Division 9.a [@ICES2018WKPELA]. The model integrated information from the PELAGO and ECOCADIZ acoustic surveys with quarterly data from the Gulf of Cadiz purse-seine fleet. The stock was initially classified as Category 1 and a July–June management cycle was adopted so that the assessment and advice calendar was aligned with the availability of survey information [@ICES2018WKPELA; @ICES2018WGHANSA]. Gadget is a statistical modelling framework designed to represent population and fishery dynamics in an integrated manner [@BegleyHowell2004; @Taylor2007Gadget].
+
+Subsequently, uncertainty associated with estimates of absolute biomass, mainly due to the estimation of survey catchability, raised concerns about the reliability of the absolute biomass level estimated by the model. Consequently, the stock was reclassified as Category 3 and the Gadget assessment was used primarily as an indicator of relative abundance [@ICES2019WGHANSA; @ICES2020WGHANSA].
+
+Under this Category 3 framework, advice was based on empirical rules for short-lived stocks, including the 1-over-2 rule [@ICES2022Cat23Guidance]. This rule adjusts the recommended catch using the ratio between the most recent biomass estimate and the mean of the two previous estimates, together with an uncertainty cap and a biomass safeguard. Its application highlighted the sensitivity of the advice to revisions of the biomass indicator and the difficulties associated with the strong interannual fluctuations characteristic of this stock [@ICES2019WGHANSA; @ICES2020WGHANSA; @ICES2021WGHANSA; @ICES2022WGHANSA; @ICES2023WGHANSA].
+
+
+
+# Previous MSE for anchovy in southern Division 9.a
+
+The limitations of the advice framework used for the southern component of
+anchovy in Division 9.a motivated the evaluation of alternative management
+procedures. In this context, within the Math4Fish project, a Management Strategy
+Evaluation (MSE) specific to ane.27.9aS was developed, in which the 1-over-2 rule
+used as the basis for advice was compared with procedures based on a constant
+harvest rate (CHR)
+[@Perez2023Math4Fish; @ICES2023WGHANSA].
+
+The MSE was implemented in FLBEIA [@Garcia2017FLBEIA], within the FLR framework
+[@Kell2007], using an Operating Model (OM) conditioned from the Gadget assessment
+available at that time. The simulation framework represented population and
+fishery dynamics and incorporated different sources of uncertainty relevant to
+the evaluation of management procedures, including variability in recruitment
+and biological parameters, assessment error, and variability in the seasonal
+distribution of catches
+[@Perez2023Math4Fish; @ICES2023WGHANSA].
+
+The evaluation was conducted using a *shortcut MSE* approach, in which the
+assessment model was not rerun within each management cycle. Instead, uncertainty
+associated with the assessment was represented by an error model applied to the
+stock information used by the management procedure. In this way, separation was
+maintained between the stock status simulated by the OM and the perceived stock
+status used to apply the control rule. This separation is relevant in an MSE,
+because assessment errors can affect the behaviour and risk associated with
+management procedures [@Wiedenmann2015; @ICES2019WKNSMSE].
+
+The results identified a CHR rule with a harvest rate of 0.5 and a
+*biomass safeguard* as a precautionary alternative to the 1-over-2 rule. Under
+the scenarios evaluated, this rule produced higher catches while maintaining
+biological risk within the criteria considered and was subsequently used as the
+basis for advice for the southern component
+[@Perez2023Math4Fish; @ICES2023WGHANSA].
+
+The MSE developed in the present work builds on this methodological experience,
+but evaluates a different management procedure. Following WKBANSP, the Gadget
+assessment was replaced by Stock Synthesis (SS3), and the assessment structure
+and reference points used to characterize stock status were updated
+[@ICES2024WKBANSP]. Consequently, the Operating Model is now conditioned from SS3
+and management procedures defined by \(F_{\mathrm{cap}}\) and
+\(B_{\mathrm{escapement}}\) are evaluated, instead of the CHR rule evaluated
+in the previous MSE.
+
+
+# WKBANSP and transition to an SS3-based Category 1 framework
+
+The assessment framework for anchovy in Division 9.a was reviewed during the *Benchmark Workshop on anchovy stocks* (WKBANSP) [@ICES2024WKBANSP]. As a result of the benchmark, the Division 9.a stock, previously treated as a single stock with two components (9.aW and 9.aS), was divided into two independent stocks: ane.27.9aW and ane.27.9aS. For ane.27.9aS, an age-structured analytical assessment implemented in Stock Synthesis (SS3) [@Methot2013] was adopted, incorporating a recruitment index derived from the biomass of age-0 individuals estimated during the autumn ECOCADIZ-RECLUTAS acoustic survey. The incorporation of this information provided an updated recruitment estimate before the advice was issued and was accompanied by a change in the management calendar, from the previously used July–June cycle to a calendar-year cycle, from January to December [@ICES2024WKBANSP; @ICES2025WGHANSA]. The new assessment allowed ane.27.9aS to move from Category 3 to Category 1. The SS3 assessment and short-term forecast currently provide a valid basis for advice [@ICES2025WGHANSA].
+
+For Category 1 short-lived stocks, the ICES framework includes an MSY strategy based on escapement. For ane.27.9aS, its application requires determining through MSE a value of \(F_{\mathrm{cap}}\) compatible with the precautionary long-term risk criterion [@ICES2024WKBANSP; @ICES2025WGHANSA]:
+
+\[
+P(SSB < B_{\mathrm{lim}}) \leq 0.05.
+\]
+
+While \(F_{\mathrm{cap}}\) remains undefined, the MSY \(B_{\mathrm{escapement}}\) strategy cannot be used as the basis for advice. For this reason, the 2025 and 2026 advice was obtained provisionally using the ICES framework for Category 3 short-lived stocks and the 1-over-2 rule, using the SSB estimated by SS3 as the biomass index [@ICES2024WGHANSA; @ICES2025WGHANSA].
+
+The definition of \(F_{\mathrm{cap}}\) and the evaluation of the management procedure required to apply the MSY \(B_{\mathrm{escapement}}\) strategy therefore constitute the main motivation for the MSE developed for ane.27.9aS. The development of this MSE was scheduled for benchmark evaluation in 2026 [@ICES2025WGHANSA].
+
+The structure of the management procedure evaluated is based on \(F_{\mathrm{cap}}\) and \(B_{\mathrm{escapement}}\). \(B_{\mathrm{escapement}}\) defines the biomass level intended to be preserved before spawning, while \(F_{\mathrm{cap}}\) sets the upper limit on fishing mortality.
+
+There are recent precedents for the MSE evaluation of this type of strategy in short-lived stocks. Trochta et al. (2024) evaluated different levels of \(B_{\mathrm{escapement}}\) for Barents Sea capelin using a probabilistic constraint on escapement biomass. More recently, ICES evaluated a strategy for North Sea sprat that combines \(B_{\mathrm{escapement}}\) and \(F_{\mathrm{cap}}\), providing a directly comparable precedent for the structure evaluated for ane.27.9aS [@ICES2026WKBHERSPRAT].
+
+For ane.27.9aS, the HCR evaluated combines \(F_{\mathrm{cap}}\) and \(B_{\mathrm{escapement}}\) and incorporates a probabilistic constraint on escapement biomass. 
+
+
+# Objectives of the current shortcut MSE
+
+Management Strategy Evaluation (MSE) allows alternative management procedures to be compared through simulation, incorporating the main sources of uncertainty that can affect both stock dynamics and the assessment and management process [@Punt2016; @ICES2020WKGMSE3].
+
+In this work, a *shortcut MSE* is developed for ane.27.9aS, updating the approach previously used for this stock [@Perez2023Math4Fish] to the SS3 assessment framework adopted during WKBANSP [@ICES2024WKBANSP]. The Operating Model is conditioned from the SS3 assessment and explicitly represents the seasonal dynamics of the population and fishery.
+
+The *shortcut* approach avoids rerunning SS3 within each management cycle. Uncertainty associated with the assessment is represented statistically, keeping the true stock dynamics simulated by the Operating Model separate from the stock perception used by the management procedure [@Punt2016; @ICES2020WKGMSE3; @Wiedenmann2015].
+
+The main objective is to evaluate candidate management procedures defined by different combinations of \(F_{\mathrm{cap}}\) and \(B_{\mathrm{escapement}}\). The main biological criterion is that the risk of the simulated true SSB being below \(B_{\mathrm{lim}}\) does not exceed 5%:
+
+\[
+P(SSB < B_{\mathrm{lim}}) \leq 0.05.
+\]
+
+For ane.27.9aS, \(B_{\mathrm{lim}} = 4\,721\) t and \(B_{\mathrm{pa}} = 6\,561\) t [@ICES2024WKBANSP; @ICES2025StockAnnex9aS]. \(B_{\mathrm{escapement}}\) is a parameter of the management procedure and must be distinguished from these biological reference points.
+
+In addition to biological risk, the performance of the management procedures is evaluated using metrics related to fishery yield and stability, including catch, its interannual variability, and the frequency of closures [@Punt2016; @ICES2020WKGMSE3; @ICES2026WKBHERSPRAT].
+
+**The following Working Documents describe the conditioning of the Operating Model, the representation of recruitment and its uncertainties, the seasonal dynamics of the fishery, the implementation of the management procedure, and the evaluation of the candidate MPs.**
+
+# References
+

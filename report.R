@@ -11,16 +11,16 @@
 
 # Working Document paths
 wd_dir <- here::here("report", "WD")
-pdf_dir <- file.path(wd_dir, "pdf")
+pdf_dir <- file.path("WD", "pdf_EN")
 dir.create(pdf_dir, recursive = TRUE, showWarnings = FALSE)
 
 # Working Documents
- rmarkdown::render(file.path(wd_dir, "00WD_Introduction_MSE_ane27_9aS_ES.Rmd"), output_dir = pdf_dir)
- rmarkdown::render(file.path(wd_dir, "01WD_OM_conditioning_ES.Rmd"), output_dir = pdf_dir)
- rmarkdown::render(file.path(wd_dir, "02WD_recruitment_SR_ES.Rmd"), output_dir = pdf_dir)
- rmarkdown::render(file.path(wd_dir, "03WD_fishery_conditioning_seasonality_ES.Rmd"), output_dir = pdf_dir)
- rmarkdown::render(file.path(wd_dir, "04WD_reference_OM_open_loop_validation_ES.Rmd"), output_dir = pdf_dir)
- rmarkdown::render(file.path(wd_dir, "05WD_assessment_error_ES.Rmd"), output_dir = pdf_dir)
+ rmarkdown::render(file.path(wd_dir, "00WD_Introduction_MSE_ane27_9aS_EN.Rmd"), output_dir = pdf_dir)
+ rmarkdown::render(file.path(wd_dir, "01WD_OM_conditioning_EN.Rmd"), output_dir = pdf_dir)
+ rmarkdown::render(file.path(wd_dir, "02WD_recruitment_SR_EN.Rmd"), output_dir = pdf_dir)
+ rmarkdown::render(file.path(wd_dir, "03WD_fishery_conditioning_seasonality_EN.Rmd"), output_dir = pdf_dir)
+ rmarkdown::render(file.path(wd_dir, "04WD_reference_OM_open_loop_validation_EN.Rmd"), output_dir = pdf_dir)
+ rmarkdown::render(file.path(wd_dir, "05WD_assessment_error_EN.Rmd"), output_dir = pdf_dir)
  rmarkdown::render(file.path(wd_dir, "06WD_Fcap_Besc.Rmd"), output_dir = pdf_dir)
  rmarkdown::render(file.path(wd_dir, "07WD_Candidate_MP_evaluation_reference_OM_ES_corrected.Rmd"), output_dir = pdf_dir)
  rmarkdown::render(file.path(wd_dir, "08WD_MP_robustness_and_implementation_ES.Rmd"), output_dir = pdf_dir)
